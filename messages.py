@@ -15,7 +15,7 @@ def main_menu_building(message: types.Message):
     posts_table = wwf.load_table(P_OWNERSHIPS).get(str(message.chat.id), [])
 
     mark_up = types.InlineKeyboardMarkup(row_width=2)
-    mark_up.add(types.InlineKeyboardButton('Мои объявленияха: ' + str(len(posts_table)), callback_data="1001"), types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
+    mark_up.add(types.InlineKeyboardButton('Мои объявления: ' + str(len(posts_table)), callback_data="1001"), types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
     mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"))
     text = "Главное меню"
     return text, mark_up
