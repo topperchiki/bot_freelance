@@ -1,21 +1,25 @@
-# Можно редактировать
+# Telegram info
+TOKEN = '825727999:AAGTZPK2TRRWZID-rxXicGpFeAbd8dbMyrk'
+BOT_USERNAME = "bot_username"
+CONTACT_ACC_USERNAME = "google"
 ID_POST_CHANNEL = -243828263
 ID_MANAGE_CHANNEL = -243828263
-BOT_USERNAME = "bot_username"
 ALLOWED_GROUP_CHATS = {ID_POST_CHANNEL, ID_MANAGE_CHANNEL}
-CONTACT_ACC_USERNAME = "google"
-URL_CONTACT_ACC = "https://t.me/" + CONTACT_ACC_USERNAME
-P_USERS = "./users.json"
-P_ORDERS = "./orders.json"
-P_ACTIONS = "./actions.txt"
-P_POSTS = "./posts.json"
-P_OWNERSHIPS = "./ownerships.json"
-P_CATEGORIES = "./categories.json"
-P_D_POSTS = "./dposts.json"
-P_CATEGORIES_R = "./categories_r.json"  # relationships
-TOKEN = '825727999:AAGTZPK2TRRWZID-rxXicGpFeAbd8dbMyrk'
-TB_NICKNAME = "freelancesystembot"
-TB_POST_URL = "t.me/" + TB_NICKNAME + "?/id_post+"
+
+# Payment
+PAYMENT_PROVIDER = '410694247:TEST:1496cc79-d856-44c4-9aa0-0271d717ca9f'
+
+# Files' path
+P_ACTIONS = "./data/actions.txt"
+P_CATEGORIES = "./data/categories.json"
+P_CATEGORIES_R = "./data/categories_r.json"  # relationships
+P_D_POSTS = "./data/dposts.json"
+P_POSTS = "./data/posts.json"
+P_ORDERS = "./data/orders.json"
+P_OWNERSHIPS = "./data/ownerships.json"
+P_USERS = "./data/users.json"
+
+# Letters limits
 FREELANCE_TITLE_LETTERS_LIMIT = 50
 FREELANCE_DESCRIPTION_LETTERS_LIMIT = 500
 FREELANCE_MEMO_LETTERS_LIMIT = 350
@@ -27,9 +31,13 @@ CUSTOMER_CONTACTS_LETTERS_LIMIT = 100
 VERIFICATION_ABOUT_LETTERS_LIMIT = 500
 VERIFICATION_LINKS_LETTERS_LIMIT = 500
 
-PAYMENT_PROVIDER = '410694247:TEST:1496cc79-d856-44c4-9aa0-0271d717ca9f'
-UTC_SHIFT = 108000  # UTC +3 Moscow, Russia
 
-# НЕ ТРОГАТЬ
+# db info
+DB_NAME = 'database'
+DB_USER = 'db_user'
+DB_HOST = 'localhost'
+DB_PASS = 'mypassword'
+
+# NOT TO EDIT
+URL_CONTACT_ACC = "https://t.me/" + CONTACT_ACC_USERNAME
 CANT_READ_FILE_EXCEPTIONS = FileNotFoundError, FileExistsError, NotADirectoryError
-BASE_URL = 'https://api.telegram.org/bot825727999:AAGTZPK2TRRWZID-rxXicGpFeAbd8dbMyrk/'

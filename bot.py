@@ -12,9 +12,6 @@ tb = telebot.TeleBot(TOKEN)
 
 @tb.message_handler(commands=['start', 'help'])
 def upper(message: telebot.types.Message):
-    if message.chat.type != 'private':
-        return
-
     with open(P_ACTIONS, "a") as f:
         f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ", time.gmtime(time.time() + UTC_SHIFT)) + str(message.chat.id) + " " + message.text)
         f.write("\n")
@@ -27,22 +24,26 @@ def upper(message: telebot.types.Message):
             add_user(message.chat.id)
         except Exception as ex:
             print(ex.__class__.__name__)
-    users_table = wwf.load_table(P_USERS)
-    if users_table[user_id]["condition"] == 29:
-        mes.error_message(message, "Закончите редактирование")
-        return
-    users_table[user_id]["condition"] = 0
-    users_table[user_id]["type_of_ap"] = ''
-    users_table[user_id]["customer_post"] = {}
-    users_table[user_id]["freelance_post"] = {}
-    users_table[user_id]["editing_freelance_post"] = {}
-    users_table[user_id]["editing_customer_post"] = {}
-    wwf.save_table(users_table, P_USERS)
-    mes.main_menu_nm(message)  # Отправка самого главного меню
-    try:
-        with open(P_ACTIONS, "w+") as f:
-            f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ", time.gmtime(time.time() + UTC_SHIFT)) + str(message.chat.id) + " " + message.text)
-    except Exception:
+
+    if message.chat.type == 'private':
+        users_table = wwf.load_table(P_USERS)
+
+        if users_table[user_id]["condition"] == 29:
+            mes.error_message(message, "Закончите редактирование")
+            return
+        users_table[user_id]["condition"] = 0
+        users_table[user_id]["type_of_ap"] = ''
+        users_table[user_id]["customer_post"] = {}
+        users_table[user_id]["freelance_post"] = {}
+        users_table[user_id]["editing_freelance_post"] = {}
+        users_table[user_id]["editing_customer_post"] = {}
+        wwf.save_table(users_table, P_USERS)
+        mes.main_menu_nm(message)  # Отправка самого главного меню
+        try:
+            with open(P_ACTIONS, "w+") as f:
+                f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ", time.gmtime(time.time() + UTC_SHIFT)) + str(message.chat.id) + " " + message.text)
+        except Exception:
+            return
         return
 
 
