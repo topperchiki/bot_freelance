@@ -1,8 +1,10 @@
-from telebot import types
-import telebot
 import work_with_files as wwf
 from constants import *
 import messages as mes
+import db
+
+from telebot import types
+import telebot
 import random
 import time
 import re
@@ -16,1570 +18,1544 @@ def upper(message: telebot.types.Message):
         f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ", time.gmtime(time.time() + UTC_SHIFT)) + str(message.chat.id) + " " + message.text)
         f.write("\n")
 
-    user_id = str(message.chat.id)
-    users_table = wwf.load_table(P_USERS)
-    if not user_id in users_table:
-        del users_table
-        try:
-            add_user(message.chat.id)
-        except Exception as ex:
-            print(ex.__class__.__name__)
+    status, user_step = db.get_user_step(message.from_user.id)
+
+    # Если такого пользователя нет
+    if not status:
+        db.add_user(message.from_user.id)
+        user_step = 0
 
     if message.chat.type == 'private':
-        users_table = wwf.load_table(P_USERS)
-
-        if users_table[user_id]["condition"] == 29:
-            mes.error_message(message, "Закончите редактирование")
+        if user_step == 29:
+            mes.text_message(message, W_COMPLETE_EDITING)
             return
-        users_table[user_id]["condition"] = 0
-        users_table[user_id]["type_of_ap"] = ''
-        users_table[user_id]["customer_post"] = {}
-        users_table[user_id]["freelance_post"] = {}
-        users_table[user_id]["editing_freelance_post"] = {}
-        users_table[user_id]["editing_customer_post"] = {}
-        wwf.save_table(users_table, P_USERS)
-        mes.main_menu_nm(message)  # Отправка самого главного меню
-        try:
-            with open(P_ACTIONS, "w+") as f:
-                f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ", time.gmtime(time.time() + UTC_SHIFT)) + str(message.chat.id) + " " + message.text)
-        except Exception:
-            return
+        mes.main_menu_nm(message)
         return
 
 
 @tb.callback_query_handler(func=lambda call: True)
 def query_handler(call):
-    if call.message.chat.type != "private":
-        if call.message.chat.id not in ALLOWED_GROUP_CHATS:
-            return
-
-    user_id = str(call.message.chat.id)
-    #  Если пользователя нет в базе, то добавляем
-    users_table = wwf.load_table(P_USERS)
-    if user_id not in users_table:
-        try:
-            add_user(call.message.chat.id)
-        except Exception as ex:
-            print(ex.__class__.__name__)
-
     with open(P_ACTIONS, "a") as f:
-        f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ", time.gmtime(time.time() + UTC_SHIFT)) + str(call.message.chat.id) + " " + call.data)
+        f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ", time.gmtime(time.time())) + str(call.message.chat.id) + " " + call.data)
         f.write("\n")
 
-    users_table = wwf.load_table(P_USERS)
+    status, user_step = db.get_user_step(call.from_user.id)
+
+    # Если такого пользователя нет, то бд ничего не вернет
+    if not status:
+        db.add_user(call.from_user.id)
+        user_step = 0
+
+
     call_data_lowered = call.data.lower()
+
     if call_data_lowered == "noanswer":
         return
 
-    elif call_data_lowered == "mainmenu":
-        mes.main_menu(call.message)
-        return
-
-    elif call_data_lowered == "sidemenu":
-        possible_come_from = {1, 4, 100}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.side_menu(call.message)
-        return
-
-    elif call_data_lowered == "paidservices":
-        possible_come_from = {1, 75}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.paid_service_menu(call.message)
-        return
-
-    elif call_data_lowered == "createfreelancerpost":
-        possible_come_from = {2, 4}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        create_temp_freelance_post(call.message.chat.id)
-        mes.categories_post(call.message)
-        return
-
-    elif call.data[:12].lower() == "category_fr:":
-        possible_come_from = {4, 5}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        category_id = call.data[12:]
-        categories_r_table = wwf.load_table(P_CATEGORIES_R)
-
-        # Проверяем, существует ли категория
-        if category_id not in categories_r_table:
+    if call.message.chat.type == "private":
+        if call_data_lowered == "mainmenu":
+            mes.main_menu(call.message)
             return
 
-        if len(categories_r_table[category_id]["children"]) > 0:
-            users_table = wwf.load_table(P_USERS)
-            users_table[user_id]["freelance_post"]["categories"].append(category_id)
-            wwf.save_table(users_table, P_USERS)
-
-            mes.subcategories_post(call.message, category_id)
-            return
-
-        # Добавляем категорию к посту
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["freelance_post"]["categories"].append(category_id)
-        # Устанавливаем шаг, на котором находимся
-        wwf.save_table(users_table, P_USERS)
-
-        # Создаем информативную кнопку
-        categories_info = wwf.load_table(P_CATEGORIES)
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text=categories_info[category_id]["name"] + " ✅", callback_data="noAnswer"))
-
-        # Удаляем предыдущую клавиатуру
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.set_title_freelance_post_nm(call.message)
-        return
-
-    elif call.data[:17].lower() == "category_back_fr:":
-        possible_come_from = {4}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        category_id = call.data[17:]
-        categories_r_table = wwf.load_table(P_CATEGORIES_R)
-        if category_id not in categories_r_table:
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        cat = users_table[user_id]["freelance_post"]["categories"]
-        if len(cat) == 1:
-            users_table[user_id]["freelance_post"]["categories"] = cat[:len(cat) - 1]
-            mes.categories_post(call.message)
-        elif len(cat) == 0:
+        elif call_data_lowered == "sidemenu":
+            if user_step not in POSSIBLE_COME_TO_SIDEMENU:
+                return
             mes.side_menu(call.message)
-        else:
-            users_table[user_id]["freelance_post"]["categories"] = cat[:len(cat) - 1]
-            mes.subcategories_post(call.message, users_table[user_id]["freelance_post"]["categories"][-1])
-        wwf.save_table(users_table, P_USERS)
-        return
-
-    elif call.data[:16].lower() == "payment_type_fr:":
-        possible_come_from = {10}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        pay_type = call.data[16:]
-        try:
-            pay_type = int(pay_type)
-        except ValueError:
             return
 
-        if pay_type < 1 or pay_type > 3:
+        elif call_data_lowered == "paidservices":
+            if user_step not in POSSIBLE_COME_TO_PAIDSERVICES:
+                return
+            mes.paid_service_menu(call.message)
             return
 
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["freelance_post"]["payment_type"] = pay_type
-        if pay_type == 1:
+        elif call_data_lowered == "createfreelancerpost":
+            if user_step not in POSSIBLE_COME_TO_CREATEFREELANCEPOST:
+                return
+            create_temp_freelance_post(call.message.chat.id)
+            mes.categories_post(call.message)
+            return
 
+        elif call.data[:12].lower() == "category_fr:":
+            if user_step not in POSSIBLE_COME_TO_CATEGORY_FR:
+                return
+
+            category_id = call.data[12:]
+
+            category_children = db.get_category_children(category_id)
+            if len(category_children) == 0:
+                return
+
+            if category_children > 0:
+                add_category(call.message.chat.id, category_id)
+
+                mes.subcategories_post(call.message, category_children)
+                return  # TODO перепроверить до сюда нужно
+
+            # Добавляем категорию к посту
+            add_category(call.message.chat.id, category_id)
+
+            # Создаем информативную кнопку
+            category_info = db.get_category_info(category_id)
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+            keyboard.add(telebot.types.InlineKeyboardButton(text=category_info[0] + " ✅", callback_data="noAnswer"))
+
             # Удаляем предыдущую клавиатуру
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.set_title_freelance_post_nm(call.message)
+            return
+
+        elif call.data[:17].lower() == "category_back_fr:":
+            if user_step not in POSSIBLE_COME_TO_CATEGORY_BACK_FR:
+                return
+
+            category_id = call.data[17:]
+            category_children = db.get_category_children(category_id)
+            if len(category_children) == 0:
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            cat = users_table[user_id]["freelance_post"]["categories"]
+            if len(cat) == 1:
+                users_table[user_id]["freelance_post"]["categories"] = cat[:len(cat) - 1]
+                mes.categories_post(call.message)
+            elif len(cat) == 0:
+                mes.side_menu(call.message)
+            else:
+                users_table[user_id]["freelance_post"]["categories"] = cat[:len(cat) - 1]
+                mes.subcategories_post(call.message, users_table[user_id]["freelance_post"]["categories"][-1])
             wwf.save_table(users_table, P_USERS)
-
-            mes.is_guarantee_necessary_freelance_nm(call.message)
             return
-        elif pay_type == 2:
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
-            # Удаляем предыдущую клавиатуру
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+        elif call.data[:16].lower() == "payment_type_fr:":
+            possible_come_from = {10}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            pay_type = call.data[16:]
+            try:
+                pay_type = int(pay_type)
+            except ValueError:
+                return
+
+            if pay_type < 1 or pay_type > 3:
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["freelance_post"]["payment_type"] = pay_type
+            if pay_type == 1:
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                wwf.save_table(users_table, P_USERS)
+
+                mes.is_guarantee_necessary_freelance_nm(call.message)
+                return
+            elif pay_type == 2:
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                wwf.save_table(users_table, P_USERS)
+
+                mes.set_fixed_price_freelance_nm(call.message)
+            elif pay_type == 3:
+                users_table[user_id]["freelance_post"]["price"] = [0, 0]
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                wwf.save_table(users_table, P_USERS)
+
+                mes.set_range_price_1_freelance_nm(call.message)
+
+            return
+
+        elif call.data[:13].lower() == "guarantee_fr:":
+            possible_come_from = {14}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            ans = call.data[13:]
+            try:
+                ans = int(ans)
+            except ValueError:
+                return
+
+            if ans != 1 and ans != 0:
+                return
+
+            ans = bool(ans)
+            users_table = wwf.load_table(P_USERS)
+            if ans:
+                users_table[user_id]["freelance_post"]["guarantee"] = True
+            else:
+                users_table[user_id]["freelance_post"]["guarantee"] = False
             wwf.save_table(users_table, P_USERS)
-
-            mes.set_fixed_price_freelance_nm(call.message)
-        elif pay_type == 3:
-            users_table[user_id]["freelance_post"]["price"] = [0, 0]
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
-            # Удаляем предыдущую клавиатуру
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            wwf.save_table(users_table, P_USERS)
-
-            mes.set_range_price_1_freelance_nm(call.message)
-
-        return
-
-    elif call.data[:13].lower() == "guarantee_fr:":
-        possible_come_from = {14}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        ans = call.data[13:]
-        try:
-            ans = int(ans)
-        except ValueError:
-            return
-
-        if ans != 1 and ans != 0:
-            return
-
-        ans = bool(ans)
-        users_table = wwf.load_table(P_USERS)
-        if ans:
-            users_table[user_id]["freelance_post"]["guarantee"] = True
-        else:
-            users_table[user_id]["freelance_post"]["guarantee"] = False
-        wwf.save_table(users_table, P_USERS)
-        mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"])
-        return
-
-    elif call_data_lowered == "no_portfolio_fr":
-        possible_come_from = {8}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["freelance_post"]["portfolio"] = ""
-        wwf.save_table(users_table, P_USERS)
-
-        mes.set_contacts_freelance_post_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_menu_fr":
-        possible_come_from = [15, 17, 18, 19, 20, 21, 22, 30, 32]
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_menu_freelance(call.message)
-        return
-
-    elif call_data_lowered[:23] == "edit_pbp_categories_fr:":
-        possible_come_from = [31, 32]
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        cat_id = call.data[23:]
-        cat_r_table = wwf.load_table(P_CATEGORIES_R)
-        users_table = wwf.load_table(P_USERS)
-        if cat_id not in cat_r_table:
-            return
-        if cat_id != "1":
-            users_table[user_id]["editing_freelance_post"]["categories"].append(cat_id)
-        else:
-            users_table[user_id]["editing_freelance_post"]["categories"] = []
-        if len(cat_r_table[cat_id]["children"]) == 0:
-            users_table[user_id]["freelance_post"]["categories"] = users_table[user_id]["editing_freelance_post"]["categories"]
-            users_table[user_id]["editing_freelance_post"]["categories"] = []
-            wwf.save_table(users_table, P_USERS)
-
-            cat_table = wwf.load_table(P_CATEGORIES)
-
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text=("..." if len(users_table[user_id]["freelance_post"]) else "") + cat_table[cat_id]["name"] + "✅", callback_data="noAnswer"))
-
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
             mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"])
             return
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_pbp_categories(call.message, cat_id)
-        return
 
-    elif call_data_lowered[:25] == "edit_pbp_categories_b_fr:":
-        possible_come_from = [32]
-        if users_table[user_id]["condition"] not in possible_come_from:
+        elif call_data_lowered == "no_portfolio_fr":
+            possible_come_from = {8}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["freelance_post"]["portfolio"] = ""
+            wwf.save_table(users_table, P_USERS)
+
+            mes.set_contacts_freelance_post_nm(call.message)
             return
-        cat_id = call.data[25:]
 
-        if cat_id == "0":
+        elif call_data_lowered == "edit_pbp_menu_fr":
+            possible_come_from = [15, 17, 18, 19, 20, 21, 22, 30, 32]
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
             mes.edit_pbp_menu_freelance(call.message)
             return
 
-        cat_r_table = wwf.load_table(P_CATEGORIES_R)
-        users_table = wwf.load_table(P_USERS)
-        if cat_id not in cat_r_table:
-            return
-
-        ca = users_table[user_id]["editing_freelance_post"]["categories"]
-        users_table[user_id]["editing_freelance_post"]["categories"] = ca[:len(ca) - 1]
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_pbp_categories(call.message, cat_id)
-
-        wwf.save_table(users_table, P_USERS)
-        return
-
-    elif call_data_lowered == "edit_pbp_title_fr":
-        possible_come_from = [31]
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Название ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_title_freelance_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_description_fr":
-        possible_come_from = {31}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Описание ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_description_freelance_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_memo_fr":
-        possible_come_from = {31}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Памятку ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_memo_freelance_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_portfolio_fr":
-        possible_come_from = {31}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Портфолио ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_portfolio_freelance_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_no_portfolio_fr":
-        possible_come_from = {30}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-
-        users_table[user_id]["freelance_post"]["portfolio"] = None
-        wwf.save_table(users_table, P_USERS)
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Удалено ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"], True)
-        mes.edit_pbp_menu_freelance_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_contacts_fr":
-        possible_come_from = {31}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Контакты ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_contacts_freelance_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_payment_fr":
-        possible_come_from = {31, 23, 27, 28}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_payment_freelance(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_payment_type_fr":
-        possible_come_from = {22, 24, 25}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_payment_type_freelance(call.message)
-        return
-
-    elif call_data_lowered[:27] == "edit_pbp_payment_type_2_fr:":
-        possible_come_from = {23}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        pay_type = call.data[27:]
-
-        try:
-            pay_type = int(pay_type)
-        except ValueError:
-            return
-
-        if pay_type == 1:
+        elif call_data_lowered[:23] == "edit_pbp_categories_fr:":
+            possible_come_from = [31, 32]
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            cat_id = call.data[23:]
+            cat_r_table = wwf.load_table(P_CATEGORIES_R)
             users_table = wwf.load_table(P_USERS)
-            users_table[user_id]["freelance_post"]["payment_type"] = 1
-            wwf.save_table(users_table, P_USERS)
+            if cat_id not in cat_r_table:
+                return
+            if cat_id != "1":
+                users_table[user_id]["editing_freelance_post"]["categories"].append(cat_id)
+            else:
+                users_table[user_id]["editing_freelance_post"]["categories"] = []
+            if len(cat_r_table[cat_id]["children"]) == 0:
+                users_table[user_id]["freelance_post"]["categories"] = users_table[user_id]["editing_freelance_post"]["categories"]
+                users_table[user_id]["editing_freelance_post"]["categories"] = []
+                wwf.save_table(users_table, P_USERS)
 
+                cat_table = wwf.load_table(P_CATEGORIES)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text=("..." if len(users_table[user_id]["freelance_post"]) else "") + cat_table[cat_id]["name"] + "✅", callback_data="noAnswer"))
+
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+                mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"])
+                return
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_pbp_categories(call.message, cat_id)
+            return
+
+        elif call_data_lowered[:25] == "edit_pbp_categories_b_fr:":
+            possible_come_from = [32]
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            cat_id = call.data[25:]
+
+            if cat_id == "0":
+                mes.edit_pbp_menu_freelance(call.message)
+                return
+
+            cat_r_table = wwf.load_table(P_CATEGORIES_R)
+            users_table = wwf.load_table(P_USERS)
+            if cat_id not in cat_r_table:
+                return
+
+            ca = users_table[user_id]["editing_freelance_post"]["categories"]
+            users_table[user_id]["editing_freelance_post"]["categories"] = ca[:len(ca) - 1]
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_pbp_categories(call.message, cat_id)
+
+            wwf.save_table(users_table, P_USERS)
+            return
+
+        elif call_data_lowered == "edit_pbp_title_fr":
+            possible_come_from = [31]
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Название ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_title_freelance_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_description_fr":
+            possible_come_from = {31}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Описание ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_description_freelance_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_memo_fr":
+            possible_come_from = {31}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Памятку ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_memo_freelance_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_portfolio_fr":
+            possible_come_from = {31}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Портфолио ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_portfolio_freelance_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_no_portfolio_fr":
+            possible_come_from = {30}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+
+            users_table[user_id]["freelance_post"]["portfolio"] = None
+            wwf.save_table(users_table, P_USERS)
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Удалено ✅", callback_data="noAnswer"))
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
             mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"], True)
             mes.edit_pbp_menu_freelance_nm(call.message)
             return
 
-        elif pay_type == 2:
+        elif call_data_lowered == "edit_pbp_contacts_fr":
+            possible_come_from = {31}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Контакты ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_contacts_freelance_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_payment_fr":
+            possible_come_from = {31, 23, 27, 28}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.edit_pbp_payment_freelance(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_payment_type_fr":
+            possible_come_from = {22, 24, 25}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.edit_pbp_payment_type_freelance(call.message)
+            return
+
+        elif call_data_lowered[:27] == "edit_pbp_payment_type_2_fr:":
+            possible_come_from = {23}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            pay_type = call.data[27:]
+
+            try:
+                pay_type = int(pay_type)
+            except ValueError:
+                return
+
+            if pay_type == 1:
+                users_table = wwf.load_table(P_USERS)
+                users_table[user_id]["freelance_post"]["payment_type"] = 1
+                wwf.save_table(users_table, P_USERS)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"], True)
+                mes.edit_pbp_menu_freelance_nm(call.message)
+                return
+
+            elif pay_type == 2:
+                users_table = wwf.load_table(P_USERS)
+                users_table[user_id]["editing_freelance_post"] = {}
+                users_table[user_id]["editing_freelance_post"]["payment_type"] = 2
+                users_table[user_id]["editing_freelance_post"]["price"] = 0
+                wwf.save_table(users_table, P_USERS)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                mes.edit_pbp_nt_fixed_price_freelance_nm(call.message)
+                return
+
+            elif pay_type == 3:
+                users_table = wwf.load_table(P_USERS)
+                users_table[user_id]["editing_freelance_post"] = {}
+                users_table[user_id]["editing_freelance_post"]["payment_type"] = 3
+                users_table[user_id]["editing_freelance_post"]["price"] = [0, 0]
+                wwf.save_table(users_table, P_USERS)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                mes.edit_pbp_nt_1_price_freelance_nm(call.message)
+                return
+
+        elif call_data_lowered == "edit_pbp_price_fr":
+            possible_come_from = {22}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированную цену ✅", callback_data="noAnswer"))
+            tb.edit_message_text(text="Изменить", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_fixed_price_freelance_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_price_2_fr":
+            possible_come_from = {22}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Изменить диапозон ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_price_1_freelance_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_guarantee_fr":
+            possible_come_from = {31}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.edit_pbp_guarantee_freelance(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_guarantee_yes_fr":
+            possible_come_from = {30}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
             users_table = wwf.load_table(P_USERS)
-            users_table[user_id]["editing_freelance_post"] = {}
-            users_table[user_id]["editing_freelance_post"]["payment_type"] = 2
-            users_table[user_id]["editing_freelance_post"]["price"] = 0
+            users_table[user_id]["freelance_post"]["guarantee"] = True
             wwf.save_table(users_table, P_USERS)
 
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
+
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            mes.edit_pbp_nt_fixed_price_freelance_nm(call.message)
+
+            mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"])
             return
 
-        elif pay_type == 3:
+        elif call_data_lowered == "edit_pbp_guarantee_no_fr":
+            possible_come_from = {30}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
             users_table = wwf.load_table(P_USERS)
-            users_table[user_id]["editing_freelance_post"] = {}
-            users_table[user_id]["editing_freelance_post"]["payment_type"] = 3
-            users_table[user_id]["editing_freelance_post"]["price"] = [0, 0]
+            users_table[user_id]["freelance_post"]["guarantee"] = False
             wwf.save_table(users_table, P_USERS)
 
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
+
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            mes.edit_pbp_nt_1_price_freelance_nm(call.message)
+
+            mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"])
             return
 
-    elif call_data_lowered == "edit_pbp_price_fr":
-        possible_come_from = {22}
-        if users_table[user_id]["condition"] not in possible_come_from:
+        elif call_data_lowered == "preview_post_fr":
+            possible_come_from = {31, 14}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.preview_post_mini(call.message)
             return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированную цену ✅", callback_data="noAnswer"))
-        tb.edit_message_text(text="Изменить", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_fixed_price_freelance_nm(call.message)
-        return
 
-    elif call_data_lowered == "edit_pbp_price_2_fr":
-        possible_come_from = {22}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Изменить диапозон ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_price_1_freelance_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_guarantee_fr":
-        possible_come_from = {31}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_guarantee_freelance(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_guarantee_yes_fr":
-        possible_come_from = {30}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["freelance_post"]["guarantee"] = True
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
-
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"])
-        return
-
-    elif call_data_lowered == "edit_pbp_guarantee_no_fr":
-        possible_come_from = {30}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["freelance_post"]["guarantee"] = False
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
-
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.preview_post_freelance_nm(call.message, users_table[user_id]["freelance_post"])
-        return
-
-    elif call_data_lowered == "preview_post_fr":
-        possible_come_from = {31, 14}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.preview_post_mini(call.message)
-        return
-
-    elif call_data_lowered == "post_fr":
-        possible_come_from = {15}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        users_table = wwf.load_table(P_USERS)
-        if users_table[user_id]["condition"] != 15:
-            return
-        posts_table = wwf.load_table(P_POSTS)
-        ownership_table = wwf.load_table(P_OWNERSHIPS)
-        new_id = random.randint(100000, 999999)
-        while new_id in posts_table:
+        elif call_data_lowered == "post_fr":
+            possible_come_from = {15}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            users_table = wwf.load_table(P_USERS)
+            if users_table[user_id]["condition"] != 15:
+                return
+            posts_table = wwf.load_table(P_POSTS)
+            ownership_table = wwf.load_table(P_OWNERSHIPS)
             new_id = random.randint(100000, 999999)
+            while new_id in posts_table:
+                new_id = random.randint(100000, 999999)
 
-        new_id = str(new_id)
-        users_table[user_id]["freelance_post"]["post_id"] = new_id
-        wwf.save_table(users_table, P_USERS)
+            new_id = str(new_id)
+            users_table[user_id]["freelance_post"]["post_id"] = new_id
+            wwf.save_table(users_table, P_USERS)
 
-        ans = mes.post_nm(ID_POST_CHANNEL, users_table[user_id]["freelance_post"])
-        posts_table[new_id] = users_table[user_id]["freelance_post"]
-        posts_table[new_id]["time_published"] = time.time()
-        posts_table[new_id]["time_upped"] = posts_table[new_id]["time_published"]
-        ownership_table[user_id].append(new_id)
-        wwf.save_table(ownership_table, P_OWNERSHIPS)
+            ans = mes.post_nm(ID_POST_CHANNEL, users_table[user_id]["freelance_post"])
+            posts_table[new_id] = users_table[user_id]["freelance_post"]
+            posts_table[new_id]["time_published"] = time.time()
+            posts_table[new_id]["time_upped"] = posts_table[new_id]["time_published"]
+            ownership_table[user_id].append(new_id)
+            wwf.save_table(ownership_table, P_OWNERSHIPS)
 
-        posts_table[new_id]["published"] = True
+            posts_table[new_id]["published"] = True
 
-        wwf.save_table(posts_table, P_POSTS)
-        dposts_table = wwf.load_table(P_D_POSTS)
-        t = posts_table[new_id]["time_published"] + 169200
-        if t in dposts_table:
-            dposts_table[t].append({"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0})
-        else:
-            dposts_table[t] = [{"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0}]
-        wwf.save_table(dposts_table, P_D_POSTS)
+            wwf.save_table(posts_table, P_POSTS)
+            dposts_table = wwf.load_table(P_D_POSTS)
+            t = posts_table[new_id]["time_published"] + 169200
+            if t in dposts_table:
+                dposts_table[t].append({"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0})
+            else:
+                dposts_table[t] = [{"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0}]
+            wwf.save_table(dposts_table, P_D_POSTS)
 
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Опубликовано ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.posted(call.message, new_id)
-        return
-
-    elif call_data_lowered == "verification":
-        possible_come_from = {3}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Верификация ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        users_table = wwf.load_table(P_USERS)
-        if users_table[user_id]["verification_request_was_sent"] != -1:
-            mes.show_verification_request(call.message, users_table[user_id])
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Опубликовано ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.posted(call.message, new_id)
             return
 
-        mes.write_about_yourself_ver_nm(call.message)
-        return
+        elif call_data_lowered == "verification":
+            possible_come_from = {3}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Верификация ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
 
-    elif call_data_lowered == "payverification":
-        possible_come_from = {77}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        if users_table[user_id]["verification_request_was_sent"] != -1:
-            return
+            users_table = wwf.load_table(P_USERS)
+            if users_table[user_id]["verification_request_was_sent"] != -1:
+                mes.show_verification_request(call.message, users_table[user_id])
+                return
 
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.buy_verification(call.message)
-        return
-
-    elif call_data_lowered[:14] == "buyingupsmenu:":
-        order_table = wwf.load_table(P_ORDERS)
-        order_table[user_id] =  {'post_id': '', 'type': '', 'number': '', "mode": ''}
-        wwf.save_table(order_table, P_ORDERS)
-        mes.buying_ups_menu(call.message, call.data[14:])
-        return
-
-    elif call_data_lowered[:14] == "buyingautoups:":
-        possible_come_from = {70, 71}
-        if users_table[user_id]["condition"] not in possible_come_from:
+            mes.write_about_yourself_ver_nm(call.message)
             return
 
-        post_id = call.data[14:]
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] == post_id:
+        elif call_data_lowered == "payverification":
+            possible_come_from = {77}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            if users_table[user_id]["verification_request_was_sent"] != -1:
+                return
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.buy_verification(call.message)
             return
-        else:
+
+        elif call_data_lowered[:14] == "buyingupsmenu:":
+            order_table = wwf.load_table(P_ORDERS)
+            order_table[user_id] =  {'post_id': '', 'type': '', 'number': '', "mode": ''}
+            wwf.save_table(order_table, P_ORDERS)
+            mes.buying_ups_menu(call.message, call.data[14:])
+            return
+
+        elif call_data_lowered[:14] == "buyingautoups:":
+            possible_come_from = {70, 71}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+
+            post_id = call.data[14:]
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] == post_id:
+                return
+            else:
+                orders_table = wwf.load_table(P_ORDERS)
+                orders_table[user_id]["type"] = 'ap'
+                orders_table[user_id]["post_id"] = post_id
+                wwf.save_table(orders_table, P_ORDERS)
+
+                mes.buying_auto_ups_menu(call.message, post_id)
+                return
+
+        elif call_data_lowered[:18] == "buyingautoupsmode:":
+            possible_come_from = {71}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mode = call.data[18]
+            try:
+                mode = int(mode)
+            except ValueError:
+                return
+            keyboard = types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(types.InlineKeyboardButton('😞', callback_data="sideMenu"))
+
+            post_id = call.data[20:]
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] == post_id:
+                return
+            if int(posts_table[post_id]['auto_ups']) != 0 and mode != int(posts_table[post_id]['auto_ups_type']):
+                a = tb.send_message(call.message.chat.id,'Вы уже купили автоподьёмы для данного объявления. Через 24 часа спустя последнее автоподнятие вы можете купить их снова',
+                                    reply_markup=keyboard)
+            else:
+                orders_table = wwf.load_table(P_ORDERS)
+                orders_table[user_id]["mode"] = mode
+                wwf.save_table(orders_table, P_ORDERS)
+
+                mes.enter_auto_ups_count_buying_nm(call.message, post_id)
+                return
+
+        elif call_data_lowered[:16] == "buyingmanualups:":
+            possible_come_from = {70}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[16:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] == post_id:
+                return
+
             orders_table = wwf.load_table(P_ORDERS)
-            orders_table[user_id]["type"] = 'ap'
+            orders_table[user_id]["type"] = 'hand'
             orders_table[user_id]["post_id"] = post_id
             wwf.save_table(orders_table, P_ORDERS)
 
-            mes.buying_auto_ups_menu(call.message, post_id)
+            mes.buying_manual_ups_menu_nm(call.message, post_id)
             return
 
-    elif call_data_lowered[:18] == "buyingautoupsmode:":
-        possible_come_from = {71}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mode = call.data[18]
-        try:
-            mode = int(mode)
-        except ValueError:
-            return
-        keyboard = types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(types.InlineKeyboardButton('😞', callback_data="sideMenu"))
+        elif call_data_lowered[:8] == "getpost:":
+            post_id = call.data[8:]
 
-        post_id = call.data[20:]
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] == post_id:
-            return
-        if int(posts_table[post_id]['auto_ups']) != 0 and mode != int(posts_table[post_id]['auto_ups_type']):
-            a = tb.send_message(call.message.chat.id,'Вы уже купили автоподьёмы для данного объявления. Через 24 часа спустя последнее автоподнятие вы можете купить их снова',
-                                reply_markup=keyboard)
-        else:
-            orders_table = wwf.load_table(P_ORDERS)
-            orders_table[user_id]["mode"] = mode
-            wwf.save_table(orders_table, P_ORDERS)
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != user_id:
+                return
 
-            mes.enter_auto_ups_count_buying_nm(call.message, post_id)
+            mes.send_post(call.message, post_id)
             return
 
-    elif call_data_lowered[:16] == "buyingmanualups:":
-        possible_come_from = {70}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[16:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] == post_id:
-            return
-
-        orders_table = wwf.load_table(P_ORDERS)
-        orders_table[user_id]["type"] = 'hand'
-        orders_table[user_id]["post_id"] = post_id
-        wwf.save_table(orders_table, P_ORDERS)
-
-        mes.buying_manual_ups_menu_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:8] == "getpost:":
-        post_id = call.data[8:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != user_id:
-            return
-
-        mes.send_post(call.message, post_id)
-        return
-
-    elif call_data_lowered == "createcustomerpost":
-        possible_come_from = {2}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        create_temp_customer_post(call.message.chat.id)
-        mes.categories_post(call.message, True)
-        return
-
-    elif call.data[:12].lower() == "category_cu:":
-        possible_come_from = {100, 101}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        category_id = call.data[12:]
-        categories_r_table = wwf.load_table(P_CATEGORIES_R)
-
-        # Проверяем, существует ли категория
-        if category_id not in categories_r_table:
-            return
-
-        if len(categories_r_table[category_id]["children"]) > 0:
-            users_table[user_id]["customer_post"]["categories"].append(category_id)
-            wwf.save_table(users_table, P_USERS)
-
-            mes.subcategories_post(call.message, category_id, True)
-            return
-
-        # Добавляем категорию к посту
-        users_table[user_id]["customer_post"]["categories"].append(category_id)
-        # Устанавливаем шаг, на котором находимся
-        wwf.save_table(users_table, P_USERS)
-
-        # Создаем информативную кнопку
-        categories_info = wwf.load_table(P_CATEGORIES)
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text=categories_info[category_id]["name"] + " ✅", callback_data="noAnswer"))
-
-        # Удаляем предыдущую клавиатуру
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.set_title_customer_post_nm(call.message)
-        return
-
-    elif call.data[:17].lower() == "category_back_cu:":
-        possible_come_from = {100, 101}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        category_id = call.data[17:]
-        categories_r_table = wwf.load_table(P_CATEGORIES_R)
-        if category_id not in categories_r_table:
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        cat = users_table[user_id]["customer_post"]["categories"]
-        if len(cat) == 1:
-            users_table[user_id]["customer_post"]["categories"] = cat[:len(cat) - 1]
+        elif call_data_lowered == "createcustomerpost":
+            possible_come_from = {2}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            create_temp_customer_post(call.message.chat.id)
             mes.categories_post(call.message, True)
-        elif len(cat) == 0:
-            mes.side_menu(call.message)
-        else:
-            users_table[user_id]["customer_post"]["categories"] = cat[:len(cat) - 1]
-            mes.subcategories_post(call.message, users_table[user_id]["customer_post"]["categories"][-1], True)
-        wwf.save_table(users_table, P_USERS)
-        return
-
-    elif call_data_lowered[:13] == "portfolio_cu:":
-        possible_come_from = {103}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        p_flag = call.data[13:]
-        try:
-            p_flag = int(p_flag)
-        except ValueError:
             return
 
-        users_table = wwf.load_table(P_USERS)
+        elif call.data[:12].lower() == "category_cu:":
+            possible_come_from = {100, 101}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            category_id = call.data[12:]
+            categories_r_table = wwf.load_table(P_CATEGORIES_R)
 
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        if p_flag == 1:
-            users_table[user_id]["customer_post"]["portfolio"] = True
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
-        elif p_flag == 0:
-            users_table[user_id]["customer_post"]["portfolio"] = False
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
-        wwf.save_table(users_table, P_USERS)
+            # Проверяем, существует ли категория
+            if category_id not in categories_r_table:
+                return
 
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.set_contacts_customer_post_nm(call.message)
-        return
+            if len(categories_r_table[category_id]["children"]) > 0:
+                users_table[user_id]["customer_post"]["categories"].append(category_id)
+                wwf.save_table(users_table, P_USERS)
 
-    elif call.data[:16].lower() == "payment_type_cu:":
-        possible_come_from = {105}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        pay_type = call.data[16:]
-        try:
-            pay_type = int(pay_type)
-        except ValueError:
-            return
+                mes.subcategories_post(call.message, category_id, True)
+                return
 
-        if pay_type < 1 or pay_type > 3:
-            return
+            # Добавляем категорию к посту
+            users_table[user_id]["customer_post"]["categories"].append(category_id)
+            # Устанавливаем шаг, на котором находимся
+            wwf.save_table(users_table, P_USERS)
 
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["customer_post"]["payment_type"] = pay_type
-        if pay_type == 1:
-
+            # Создаем информативную кнопку
+            categories_info = wwf.load_table(P_CATEGORIES)
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+            keyboard.add(telebot.types.InlineKeyboardButton(text=categories_info[category_id]["name"] + " ✅", callback_data="noAnswer"))
+
             # Удаляем предыдущую клавиатуру
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.set_title_customer_post_nm(call.message)
+            return
+
+        elif call.data[:17].lower() == "category_back_cu:":
+            possible_come_from = {100, 101}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            category_id = call.data[17:]
+            categories_r_table = wwf.load_table(P_CATEGORIES_R)
+            if category_id not in categories_r_table:
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            cat = users_table[user_id]["customer_post"]["categories"]
+            if len(cat) == 1:
+                users_table[user_id]["customer_post"]["categories"] = cat[:len(cat) - 1]
+                mes.categories_post(call.message, True)
+            elif len(cat) == 0:
+                mes.side_menu(call.message)
+            else:
+                users_table[user_id]["customer_post"]["categories"] = cat[:len(cat) - 1]
+                mes.subcategories_post(call.message, users_table[user_id]["customer_post"]["categories"][-1], True)
             wwf.save_table(users_table, P_USERS)
-
-            mes.is_guarantee_necessary_customer_nm(call.message)
-            return
-        elif pay_type == 2:
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
-            # Удаляем предыдущую клавиатуру
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            wwf.save_table(users_table, P_USERS)
-
-            mes.set_fixed_price_customer_nm(call.message)
-        elif pay_type == 3:
-            users_table[user_id]["customer_post"]["price"] = [0, 0]
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
-            # Удаляем предыдущую клавиатуру
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            wwf.save_table(users_table, P_USERS)
-
-            mes.set_range_price_1_customer_nm(call.message)
-
-        return
-
-    elif call_data_lowered[:13] == "guarantee_cu:":
-        possible_come_from = {109}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        g_flag = call.data[13:]
-        try:
-            g_flag = int(g_flag)
-        except ValueError:
             return
 
-        users_table = wwf.load_table(P_USERS)
+        elif call_data_lowered[:13] == "portfolio_cu:":
+            possible_come_from = {103}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            p_flag = call.data[13:]
+            try:
+                p_flag = int(p_flag)
+            except ValueError:
+                return
 
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        if g_flag == 1:
-            users_table[user_id]["customer_post"]["guarantee"] = True
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Да ", callback_data="noAnswer"))
-        else:
-            users_table[user_id]["customer_post"]["guarantee"] = False
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ", callback_data="noAnswer"))
-        wwf.save_table(users_table, P_USERS)
-
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"])
-        return
-
-    elif call_data_lowered == "post_cu":
-        possible_come_from = {110}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        users_table = wwf.load_table(P_USERS)
-        if users_table[user_id]["condition"] != 110:
-            return
-        posts_table = wwf.load_table(P_POSTS)
-        ownership_table = wwf.load_table(P_OWNERSHIPS)
-        new_id = random.randint(100000, 999999)
-        while new_id in posts_table:
-            new_id = random.randint(100000, 999999)
-        new_id = str(new_id)
-
-        users_table[user_id]["customer_post"]["post_id"] = new_id
-        wwf.save_table(users_table, P_USERS)
-
-        ans = mes.post_nm(ID_POST_CHANNEL, users_table[user_id]["customer_post"])
-        posts_table[new_id] = users_table[user_id]["customer_post"]
-        posts_table[new_id]["time_published"] = time.time()
-        posts_table[new_id]["time_upped"] = posts_table[new_id]["time_published"]
-        ownership_table[user_id].append(new_id)
-        wwf.save_table(ownership_table, P_OWNERSHIPS)
-
-        posts_table[new_id]["published"] = True
-
-        wwf.save_table(posts_table, P_POSTS)
-        dposts_table = wwf.load_table(P_D_POSTS)
-        t = posts_table[new_id]["time_published"] + 169200
-        if t in dposts_table:
-            dposts_table[t].append({"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0})
-        else:
-            dposts_table[t] = [{"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0}]
-        wwf.save_table(dposts_table, P_D_POSTS)
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Опубликовано ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.posted(call.message, new_id)
-        return
-
-    elif call_data_lowered == "edit_pbp_menu_cu":
-        possible_come_from = {110, 111, 125, 112, 113, 114, 115, 123}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_menu_customer(call.message)
-
-    elif call_data_lowered[:23] == "edit_pbp_categories_cu:":
-        possible_come_from = {124, 125}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        cat_id = call.data[23:]
-        cat_r_table = wwf.load_table(P_CATEGORIES_R)
-        users_table = wwf.load_table(P_USERS)
-        if cat_id not in cat_r_table:
-            return
-        if cat_id != "1":
-            users_table[user_id]["editing_customer_post"]["categories"].append(cat_id)
-        else:
-            users_table[user_id]["editing_customer_post"]["categories"] = []
-        if len(cat_r_table[cat_id]["children"]) == 0:
-            users_table[user_id]["customer_post"]["categories"] = users_table[user_id]["editing_customer_post"]["categories"]
-            users_table[user_id]["editing_customer_post"]["categories"] = []
-            wwf.save_table(users_table, P_USERS)
-
-            cat_table = wwf.load_table(P_CATEGORIES)
+            users_table = wwf.load_table(P_USERS)
 
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text=("..." if len(users_table[user_id]["customer_post"]) else "") + cat_table[cat_id]["name"] + "✅", callback_data="noAnswer"))
+            if p_flag == 1:
+                users_table[user_id]["customer_post"]["portfolio"] = True
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
+            elif p_flag == 0:
+                users_table[user_id]["customer_post"]["portfolio"] = False
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
+            wwf.save_table(users_table, P_USERS)
 
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.set_contacts_customer_post_nm(call.message)
+            return
 
+        elif call.data[:16].lower() == "payment_type_cu:":
+            possible_come_from = {105}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            pay_type = call.data[16:]
+            try:
+                pay_type = int(pay_type)
+            except ValueError:
+                return
+
+            if pay_type < 1 or pay_type > 3:
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["customer_post"]["payment_type"] = pay_type
+            if pay_type == 1:
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                wwf.save_table(users_table, P_USERS)
+
+                mes.is_guarantee_necessary_customer_nm(call.message)
+                return
+            elif pay_type == 2:
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                wwf.save_table(users_table, P_USERS)
+
+                mes.set_fixed_price_customer_nm(call.message)
+            elif pay_type == 3:
+                users_table[user_id]["customer_post"]["price"] = [0, 0]
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                wwf.save_table(users_table, P_USERS)
+
+                mes.set_range_price_1_customer_nm(call.message)
+
+            return
+
+        elif call_data_lowered[:13] == "guarantee_cu:":
+            possible_come_from = {109}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            g_flag = call.data[13:]
+            try:
+                g_flag = int(g_flag)
+            except ValueError:
+                return
+
+            users_table = wwf.load_table(P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            if g_flag == 1:
+                users_table[user_id]["customer_post"]["guarantee"] = True
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Да ", callback_data="noAnswer"))
+            else:
+                users_table[user_id]["customer_post"]["guarantee"] = False
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ", callback_data="noAnswer"))
+            wwf.save_table(users_table, P_USERS)
+
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
             mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"])
             return
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_pbp_categories(call.message, cat_id, True)
-        return
 
-    elif call_data_lowered[:25] == "edit_pbp_categories_b_cu:":
-        possible_come_from = {124, 125}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        cat_id = call.data[25:]
-
-        if cat_id == "0":
-            mes.edit_pbp_menu_customer(call.message)
-            return
-
-        cat_r_table = wwf.load_table(P_CATEGORIES_R)
-        users_table = wwf.load_table(P_USERS)
-        if cat_id not in cat_r_table:
-            return
-        ca = users_table[user_id]["editing_customer_post"]["categories"]
-        users_table[user_id]["editing_customer_post"]["categories"] = ca[:len(ca) - 1]
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_pbp_categories(call.message, cat_id, True)
-        return
-
-    elif call_data_lowered == "edit_pbp_title_cu":
-        possible_come_from = {124}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Название ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_title_customer_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_description_cu":
-        possible_come_from = {124}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Описание ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_description_customer_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_portfolio_cu":
-        possible_come_from = {124}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Портфолио ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_portfolio_customer_nm(call.message)
-        return
-
-    elif call_data_lowered[:24] == "edit_pbp_portfolio_1_cu:":
-        possible_come_from = {113}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        p_flag = call.data[24:]
-        try:
-            p_flag = int(p_flag)
-        except ValueError:
-            return
-
-        users_table = wwf.load_table(P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        if p_flag == 1:
-            users_table[user_id]["customer_post"]["portfolio"] = True
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
-        elif p_flag == 0:
-            users_table[user_id]["customer_post"]["portfolio"] = False
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
-        wwf.save_table(users_table, P_USERS)
-
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"], True)
-        mes.edit_pbp_menu_customer_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_contacts_cu":
-        possible_come_from = {124}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Контакты ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_contacts_customer_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_payment_cu":
-        possible_come_from = {124, 116, 120, 121}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_payment_customer(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_payment_type_cu":
-        possible_come_from = {115, 117, 118}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_payment_type_customer(call.message)
-        return
-
-    elif call_data_lowered[:27] == "edit_pbp_payment_type_2_cu:":
-        possible_come_from = {116}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        pay_type = call.data[27:]
-
-        try:
-            pay_type = int(pay_type)
-        except ValueError:
-            return
-
-        if pay_type == 1:
+        elif call_data_lowered == "post_cu":
+            possible_come_from = {110}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
             users_table = wwf.load_table(P_USERS)
-            users_table[user_id]["customer_post"]["payment_type"] = 1
+            if users_table[user_id]["condition"] != 110:
+                return
+            posts_table = wwf.load_table(P_POSTS)
+            ownership_table = wwf.load_table(P_OWNERSHIPS)
+            new_id = random.randint(100000, 999999)
+            while new_id in posts_table:
+                new_id = random.randint(100000, 999999)
+            new_id = str(new_id)
+
+            users_table[user_id]["customer_post"]["post_id"] = new_id
             wwf.save_table(users_table, P_USERS)
 
+            ans = mes.post_nm(ID_POST_CHANNEL, users_table[user_id]["customer_post"])
+            posts_table[new_id] = users_table[user_id]["customer_post"]
+            posts_table[new_id]["time_published"] = time.time()
+            posts_table[new_id]["time_upped"] = posts_table[new_id]["time_published"]
+            ownership_table[user_id].append(new_id)
+            wwf.save_table(ownership_table, P_OWNERSHIPS)
+
+            posts_table[new_id]["published"] = True
+
+            wwf.save_table(posts_table, P_POSTS)
+            dposts_table = wwf.load_table(P_D_POSTS)
+            t = posts_table[new_id]["time_published"] + 169200
+            if t in dposts_table:
+                dposts_table[t].append({"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0})
+            else:
+                dposts_table[t] = [{"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0}]
+            wwf.save_table(dposts_table, P_D_POSTS)
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Опубликовано ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.posted(call.message, new_id)
+            return
+
+        elif call_data_lowered == "edit_pbp_menu_cu":
+            possible_come_from = {110, 111, 125, 112, 113, 114, 115, 123}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.edit_pbp_menu_customer(call.message)
+
+        elif call_data_lowered[:23] == "edit_pbp_categories_cu:":
+            possible_come_from = {124, 125}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            cat_id = call.data[23:]
+            cat_r_table = wwf.load_table(P_CATEGORIES_R)
+            users_table = wwf.load_table(P_USERS)
+            if cat_id not in cat_r_table:
+                return
+            if cat_id != "1":
+                users_table[user_id]["editing_customer_post"]["categories"].append(cat_id)
+            else:
+                users_table[user_id]["editing_customer_post"]["categories"] = []
+            if len(cat_r_table[cat_id]["children"]) == 0:
+                users_table[user_id]["customer_post"]["categories"] = users_table[user_id]["editing_customer_post"]["categories"]
+                users_table[user_id]["editing_customer_post"]["categories"] = []
+                wwf.save_table(users_table, P_USERS)
+
+                cat_table = wwf.load_table(P_CATEGORIES)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text=("..." if len(users_table[user_id]["customer_post"]) else "") + cat_table[cat_id]["name"] + "✅", callback_data="noAnswer"))
+
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+                mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"])
+                return
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_pbp_categories(call.message, cat_id, True)
+            return
+
+        elif call_data_lowered[:25] == "edit_pbp_categories_b_cu:":
+            possible_come_from = {124, 125}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            cat_id = call.data[25:]
+
+            if cat_id == "0":
+                mes.edit_pbp_menu_customer(call.message)
+                return
+
+            cat_r_table = wwf.load_table(P_CATEGORIES_R)
+            users_table = wwf.load_table(P_USERS)
+            if cat_id not in cat_r_table:
+                return
+            ca = users_table[user_id]["editing_customer_post"]["categories"]
+            users_table[user_id]["editing_customer_post"]["categories"] = ca[:len(ca) - 1]
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_pbp_categories(call.message, cat_id, True)
+            return
+
+        elif call_data_lowered == "edit_pbp_title_cu":
+            possible_come_from = {124}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Название ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_title_customer_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_description_cu":
+            possible_come_from = {124}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Описание ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_description_customer_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_portfolio_cu":
+            possible_come_from = {124}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Портфолио ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_portfolio_customer_nm(call.message)
+            return
+
+        elif call_data_lowered[:24] == "edit_pbp_portfolio_1_cu:":
+            possible_come_from = {113}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            p_flag = call.data[24:]
+            try:
+                p_flag = int(p_flag)
+            except ValueError:
+                return
+
+            users_table = wwf.load_table(P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            if p_flag == 1:
+                users_table[user_id]["customer_post"]["portfolio"] = True
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
+            elif p_flag == 0:
+                users_table[user_id]["customer_post"]["portfolio"] = False
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
+            wwf.save_table(users_table, P_USERS)
+
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
             mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"], True)
             mes.edit_pbp_menu_customer_nm(call.message)
             return
 
-        elif pay_type == 2:
+        elif call_data_lowered == "edit_pbp_contacts_cu":
+            possible_come_from = {124}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Контакты ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_contacts_customer_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_payment_cu":
+            possible_come_from = {124, 116, 120, 121}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.edit_pbp_payment_customer(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_payment_type_cu":
+            possible_come_from = {115, 117, 118}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.edit_pbp_payment_type_customer(call.message)
+            return
+
+        elif call_data_lowered[:27] == "edit_pbp_payment_type_2_cu:":
+            possible_come_from = {116}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            pay_type = call.data[27:]
+
+            try:
+                pay_type = int(pay_type)
+            except ValueError:
+                return
+
+            if pay_type == 1:
+                users_table = wwf.load_table(P_USERS)
+                users_table[user_id]["customer_post"]["payment_type"] = 1
+                wwf.save_table(users_table, P_USERS)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"], True)
+                mes.edit_pbp_menu_customer_nm(call.message)
+                return
+
+            elif pay_type == 2:
+                users_table = wwf.load_table(P_USERS)
+                users_table[user_id]["editing_customer_post"] = {}
+                users_table[user_id]["editing_customer_post"]["payment_type"] = 2
+                users_table[user_id]["editing_customer_post"]["price"] = 0
+                wwf.save_table(users_table, P_USERS)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                mes.edit_pbp_nt_fixed_price_customer_nm(call.message)
+                return
+
+            elif pay_type == 3:
+                users_table = wwf.load_table(P_USERS)
+                users_table[user_id]["editing_customer_post"] = {}
+                users_table[user_id]["editing_customer_post"]["payment_type"] = 3
+                users_table[user_id]["editing_customer_post"]["price"] = [0, 0]
+                wwf.save_table(users_table, P_USERS)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                mes.edit_pbp_nt_1_price_customer_nm(call.message)
+                return
+
+        elif call_data_lowered == "edit_pbp_price_cu":
+            possible_come_from = {116}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированную цену ✅", callback_data="noAnswer"))
+            tb.edit_message_text(text="Изменить", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_fixed_price_customer_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_price_2_cu":
+            possible_come_from = {116}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Изменить диапозон ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_pbp_price_1_customer_nm(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_guarantee_cu":
+            possible_come_from = {124}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.edit_pbp_guarantee_customer(call.message)
+            return
+
+        elif call_data_lowered == "edit_pbp_guarantee_yes_cu":
+            possible_come_from = {123}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
             users_table = wwf.load_table(P_USERS)
-            users_table[user_id]["editing_customer_post"] = {}
-            users_table[user_id]["editing_customer_post"]["payment_type"] = 2
-            users_table[user_id]["editing_customer_post"]["price"] = 0
+            users_table[user_id]["customer_post"]["guarantee"] = True
+            wwf.save_table(users_table, P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
+
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"])
+            return
+
+        elif call_data_lowered == "edit_pbp_guarantee_no_cu":
+            possible_come_from = {123}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["customer_post"]["guarantee"] = False
+            wwf.save_table(users_table, P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
+
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"])
+            return
+
+        elif call_data_lowered == "preview_post_cu":
+            possible_come_from = {124, 109}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            mes.preview_post_mini(call.message, True)
+            return
+
+        elif call_data_lowered[:5] == "edit:":
+            post_id = call.data[5:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            mes.edit_post_menu(call.message, post_id)
+            return
+
+        elif call_data_lowered[:11] == "edit_title:":
+            possible_come_from = {80}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[11:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != user_id:
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            wwf.save_table(users_table, P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Название ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.edit_title_nm(call.message)
+            return
+
+        elif call_data_lowered[:19] == "edit_guarantee_yes:":
+            possible_come_from = {88}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[19:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            posts_table[post_id]["guarantee"] = True
+            wwf.save_table(posts_table, P_POSTS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.send_post_nm(call.message, post_id)
+            return
+
+        elif call_data_lowered[:18] == "edit_guarantee_no:":
+            possible_come_from = {88}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[18:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            posts_table[post_id]["guarantee"] = False
+            wwf.save_table(posts_table, P_POSTS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.send_post_nm(call.message, post_id)
+            return
+
+        elif call_data_lowered[:19] == "edit_portfolio_yes:":
+            possible_come_from = {87}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[19:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            posts_table[post_id]["portfolio"] = True
+            wwf.save_table(posts_table, P_POSTS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.send_post_nm(call.message, post_id)
+            return
+
+        elif call_data_lowered[:18] == "edit_portfolio_no:":
+            possible_come_from = {87}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[18:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            posts_table[post_id]["portfolio"] = False
+            wwf.save_table(posts_table, P_POSTS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.send_post_nm(call.message, post_id)
+            return
+
+        elif call_data_lowered[:17] == "edit_description:":
+            possible_come_from = {80}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[17:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            wwf.save_table(users_table, P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Описание ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.edit_description_nm(call.message)
+            return
+
+        elif call_data_lowered[:10] == "edit_memo:":
+            possible_come_from = {80}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[10:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            wwf.save_table(users_table, P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Памятку ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.edit_memo_nm(call.message)
+            return
+
+        elif call_data_lowered[:15] == "edit_portfolio:":
+            possible_come_from = {80}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[15:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            wwf.save_table(users_table, P_USERS)
+
+            if posts_table[post_id]["type"] == 1:
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Портфолио ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                mes.edit_portfolio_fr_nm(call.message, post_id)
+            elif posts_table[post_id]["type"] == 2:
+                mes.edit_portfolio_cu(call.message, post_id)
+            return
+
+        elif call_data_lowered[:15] == "edit_guarantee:":
+            possible_come_from = {80}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[15:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            wwf.save_table(users_table, P_USERS)
+
+            mes.edit_guarantee(call.message, post_id)
+            return
+
+        elif call_data_lowered[:14] == "edit_contacts:":
+            possible_come_from = {80}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[14:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            wwf.save_table(users_table, P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Контакты ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            mes.edit_contacts_nm(call.message)
+            return
+
+        elif call_data_lowered[:16] == "edit_categories:":
+            possible_come_from = {80}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[16:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            users_table[user_id]["editing"]["categories"] = []
+            wwf.save_table(users_table, P_USERS)
+
+            mes.edit_categories(call.message, "1")
+            return
+
+        elif call_data_lowered[:18] == "edit_categories_1:":
+            possible_come_from = {"80", "81"}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            cat_id = call.data[18:]
+            cat_r_table = wwf.load_table(P_CATEGORIES_R)
+            users_table = wwf.load_table(P_USERS)
+            if cat_id not in cat_r_table:
+                return
+            if cat_id != "1":
+                users_table[user_id]["editing"]["categories"].append(cat_id)
+            else:
+                users_table[user_id]["editing"]["categories"] = []
+            if len(cat_r_table[cat_id]["children"]) == 0:
+                posts_table = wwf.load_table(P_POSTS)
+                posts_table[users_table[user_id]["editing"]["post_id"]]["categories"] = users_table[user_id]["editing"]["categories"]
+                users_table[user_id]["editing"]["categories"] = []
+                wwf.save_table(users_table, P_USERS)
+                wwf.save_table(posts_table, P_POSTS)
+
+                cat_table = wwf.load_table(P_CATEGORIES)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text=("..." if len(posts_table[users_table[user_id]["editing"]["post_id"]]["categories"]) else "") + cat_table[cat_id]["name"] + "✅", callback_data="noAnswer"))
+
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+                mes.send_post_nm(call.message, users_table[user_id]["editing"]["post_id"])
+                return
+
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_categories(call.message, cat_id)
+            return
+
+        elif call_data_lowered[:18] == "edit_categories_b:":
+            possible_come_from = {81}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            cat_id = call.data[18:]
+
+            if cat_id == "0":
+                users_table = wwf.load_table(P_USERS)
+                mes.edit_post_menu(call.message, users_table["editing"]["post_id"])
+                return
+
+            cat_r_table = wwf.load_table(P_CATEGORIES_R)
+            users_table = wwf.load_table(P_USERS)
+            if cat_id not in cat_r_table:
+                return
+
+            ca = users_table[user_id]["editing"]["categories"]
+            users_table[user_id]["editing"]["categories"] = ca[:len(ca) - 1]
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_pbp_categories(call.message, cat_id)
+
+            wwf.save_table(users_table, P_USERS)
+            return
+
+        elif call_data_lowered[:22] == "edit_portfolio_delete:":
+            possible_come_from = {86}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[22:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            posts_table[post_id]["portfolio"] = ""
+            wwf.save_table(posts_table, P_POSTS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Удалено ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.send_post_nm(call.message, post_id)
+            return
+
+        elif call_data_lowered[:15] == "edit_pay_type1:":
+            possible_come_from = {89}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[15:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            posts_table[post_id]["payment_type"] = 1
+            wwf.save_table(posts_table, P_POSTS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.send_post_nm(call.message, post_id)
+            return
+
+        elif call_data_lowered[:15] == "edit_pay_type2:":
+            possible_come_from = {89}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[15:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
+            users_table = wwf.load_table(P_USERS)
+            users_table[user_id]["editing"]["post_id"] = post_id
+            users_table[user_id]["editing"]["payment_type"] = 2
             wwf.save_table(users_table, P_USERS)
 
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
             keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            mes.edit_pbp_nt_fixed_price_customer_nm(call.message)
+
+            mes.edit_fixed_price_nm(call.message)
             return
 
-        elif pay_type == 3:
+        elif call_data_lowered[:15] == "edit_pay_type3:":
+            possible_come_from = {89}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[15:]
+
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
+
             users_table = wwf.load_table(P_USERS)
-            users_table[user_id]["editing_customer_post"] = {}
-            users_table[user_id]["editing_customer_post"]["payment_type"] = 3
-            users_table[user_id]["editing_customer_post"]["price"] = [0, 0]
+            users_table[user_id]["editing"]["post_id"] = post_id
+            users_table[user_id]["editing"]["payment_type"] = 3
             wwf.save_table(users_table, P_USERS)
 
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
             keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            mes.edit_pbp_nt_1_price_customer_nm(call.message)
+
+            mes.edit_price_1_nm(call.message)
             return
 
-    elif call_data_lowered == "edit_pbp_price_cu":
-        possible_come_from = {116}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированную цену ✅", callback_data="noAnswer"))
-        tb.edit_message_text(text="Изменить", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_fixed_price_customer_nm(call.message)
-        return
+        elif call_data_lowered[:13] == "edit_payment:":
+            possible_come_from = {80, 90, 91}
+            if users_table[user_id]["condition"] not in possible_come_from:
+                return
+            post_id = call.data[13:]
 
-    elif call_data_lowered == "edit_pbp_price_2_cu":
-        possible_come_from = {116}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Изменить диапозон ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_pbp_price_1_customer_nm(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_guarantee_cu":
-        possible_come_from = {124}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.edit_pbp_guarantee_customer(call.message)
-        return
-
-    elif call_data_lowered == "edit_pbp_guarantee_yes_cu":
-        possible_come_from = {123}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["customer_post"]["guarantee"] = True
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
-
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"])
-        return
-
-    elif call_data_lowered == "edit_pbp_guarantee_no_cu":
-        possible_come_from = {123}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["customer_post"]["guarantee"] = False
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ❌", callback_data="noAnswer"))
-
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.preview_post_customer_nm(call.message, users_table[user_id]["customer_post"])
-        return
-
-    elif call_data_lowered == "preview_post_cu":
-        possible_come_from = {124, 109}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        mes.preview_post_mini(call.message, True)
-        return
-
-    elif call_data_lowered[:5] == "edit:":
-        post_id = call.data[5:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        mes.edit_post_menu(call.message, post_id)
-        return
-
-    elif call_data_lowered[:11] == "edit_title:":
-        possible_come_from = {80}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[11:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != user_id:
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Название ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.edit_title_nm(call.message)
-        return
-
-    elif call_data_lowered[:19] == "edit_guarantee_yes:":
-        possible_come_from = {88}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[19:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        posts_table[post_id]["guarantee"] = True
-        wwf.save_table(posts_table, P_POSTS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.send_post_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:18] == "edit_guarantee_no:":
-        possible_come_from = {88}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[18:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        posts_table[post_id]["guarantee"] = False
-        wwf.save_table(posts_table, P_POSTS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.send_post_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:19] == "edit_portfolio_yes:":
-        possible_come_from = {87}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[19:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        posts_table[post_id]["portfolio"] = True
-        wwf.save_table(posts_table, P_POSTS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.send_post_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:18] == "edit_portfolio_no:":
-        possible_come_from = {87}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[18:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        posts_table[post_id]["portfolio"] = False
-        wwf.save_table(posts_table, P_POSTS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.send_post_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:17] == "edit_description:":
-        possible_come_from = {80}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[17:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Описание ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.edit_description_nm(call.message)
-        return
-
-    elif call_data_lowered[:10] == "edit_memo:":
-        possible_come_from = {80}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[10:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Памятку ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.edit_memo_nm(call.message)
-        return
-
-    elif call_data_lowered[:15] == "edit_portfolio:":
-        possible_come_from = {80}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[15:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        wwf.save_table(users_table, P_USERS)
-
-        if posts_table[post_id]["type"] == 1:
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Портфолио ✅", callback_data="noAnswer"))
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-            mes.edit_portfolio_fr_nm(call.message, post_id)
-        elif posts_table[post_id]["type"] == 2:
-            mes.edit_portfolio_cu(call.message, post_id)
-        return
-
-    elif call_data_lowered[:15] == "edit_guarantee:":
-        possible_come_from = {80}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[15:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        wwf.save_table(users_table, P_USERS)
-
-        mes.edit_guarantee(call.message, post_id)
-        return
-
-    elif call_data_lowered[:14] == "edit_contacts:":
-        possible_come_from = {80}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[14:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Контакты ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.edit_contacts_nm(call.message)
-        return
-
-    elif call_data_lowered[:16] == "edit_categories:":
-        possible_come_from = {80}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[16:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        users_table[user_id]["editing"]["categories"] = []
-        wwf.save_table(users_table, P_USERS)
-
-        mes.edit_categories(call.message, "1")
-        return
-
-    elif call_data_lowered[:18] == "edit_categories_1:":
-        possible_come_from = {"80", "81"}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        cat_id = call.data[18:]
-        cat_r_table = wwf.load_table(P_CATEGORIES_R)
-        users_table = wwf.load_table(P_USERS)
-        if cat_id not in cat_r_table:
-            return
-        if cat_id != "1":
-            users_table[user_id]["editing"]["categories"].append(cat_id)
-        else:
-            users_table[user_id]["editing"]["categories"] = []
-        if len(cat_r_table[cat_id]["children"]) == 0:
             posts_table = wwf.load_table(P_POSTS)
-            posts_table[users_table[user_id]["editing"]["post_id"]]["categories"] = users_table[user_id]["editing"]["categories"]
-            users_table[user_id]["editing"]["categories"] = []
-            wwf.save_table(users_table, P_USERS)
-            wwf.save_table(posts_table, P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != user_id:
+                return
 
-            cat_table = wwf.load_table(P_CATEGORIES)
-
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text=("..." if len(posts_table[users_table[user_id]["editing"]["post_id"]]["categories"]) else "") + cat_table[cat_id]["name"] + "✅", callback_data="noAnswer"))
-
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-            mes.send_post_nm(call.message, users_table[user_id]["editing"]["post_id"])
-            return
-
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_categories(call.message, cat_id)
-        return
-
-    elif call_data_lowered[:18] == "edit_categories_b:":
-        possible_come_from = {81}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        cat_id = call.data[18:]
-
-        if cat_id == "0":
             users_table = wwf.load_table(P_USERS)
-            mes.edit_post_menu(call.message, users_table["editing"]["post_id"])
+            users_table[user_id]["editing"]["post_id"] = post_id
+            wwf.save_table(users_table, P_USERS)
+
+            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Оплату ✅", callback_data="noAnswer"))
+            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+            mes.edit_pay_nm(call.message, post_id)
             return
 
-        cat_r_table = wwf.load_table(P_CATEGORIES_R)
-        users_table = wwf.load_table(P_USERS)
-        if cat_id not in cat_r_table:
-            return
+        elif call_data_lowered[:3] == "up:":
+            post_id = call.data[3:]
 
-        ca = users_table[user_id]["editing"]["categories"]
-        users_table[user_id]["editing"]["categories"] = ca[:len(ca) - 1]
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_pbp_categories(call.message, cat_id)
+            posts_table = wwf.load_table(P_POSTS)
+            if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
+                return
 
-        wwf.save_table(users_table, P_USERS)
-        return
+            if users_table[user_id]["manual_ups"] == 0:
+                mes.error_message(call.message, "Сначала купите ручные подъемы для этого объявления")
+                return
 
-    elif call_data_lowered[:22] == "edit_portfolio_delete:":
-        possible_come_from = {86}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[22:]
+            dif = min(max(time.time() - posts_table[post_id]["time_upped"], 0), 10800)
+            if dif < 10800:
+                next_possible_up_time = 10800 - dif
+                mes.error_message(call.message, "Ручной подъем можно делать не чаще 1 раза в 3 часа. До следующего подъема осталось: " + str(int(next_possible_up_time / 3600)) + ":" + str(int((next_possible_up_time % 3600) / 60)) + ":" + str(int((next_possible_up_time % 60))))
+                return
 
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        posts_table[post_id]["portfolio"] = ""
-        wwf.save_table(posts_table, P_POSTS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Удалено ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.send_post_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:15] == "edit_pay_type1:":
-        possible_come_from = {89}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[15:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        posts_table[post_id]["payment_type"] = 1
-        wwf.save_table(posts_table, P_POSTS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Договорная ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.send_post_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:15] == "edit_pay_type2:":
-        possible_come_from = {89}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[15:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        users_table[user_id]["editing"]["payment_type"] = 2
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Фиксированная ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.edit_fixed_price_nm(call.message)
-        return
-
-    elif call_data_lowered[:15] == "edit_pay_type3:":
-        possible_come_from = {89}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[15:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        users_table[user_id]["editing"]["payment_type"] = 3
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Диапозон ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.edit_price_1_nm(call.message)
-        return
-
-    elif call_data_lowered[:13] == "edit_payment:":
-        possible_come_from = {80, 90, 91}
-        if users_table[user_id]["condition"] not in possible_come_from:
-            return
-        post_id = call.data[13:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != user_id:
-            return
-
-        users_table = wwf.load_table(P_USERS)
-        users_table[user_id]["editing"]["post_id"] = post_id
-        wwf.save_table(users_table, P_USERS)
-
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Оплату ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-        mes.edit_pay_nm(call.message, post_id)
-        return
-
-    elif call_data_lowered[:3] == "up:":
-        post_id = call.data[3:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if post_id not in posts_table or posts_table[post_id]["owner_id"] != str(call.message.chat.id):
-            return
-
-        if users_table[user_id]["manual_ups"] == 0:
-            mes.error_message(call.message, "Сначала купите ручные подъемы для этого объявления")
-            return
-
-        dif = min(max(time.time() - posts_table[post_id]["time_upped"], 0), 10800)
-        if dif < 10800:
-            next_possible_up_time = 10800 - dif
-            mes.error_message(call.message, "Ручной подъем можно делать не чаще 1 раза в 3 часа. До следующего подъема осталось: " + str(int(next_possible_up_time / 3600)) + ":" + str(int((next_possible_up_time % 3600) / 60)) + ":" + str(int((next_possible_up_time % 60))))
-            return
-
-        users_table[user_id]["manual_ups"] -= 1
-        wwf.save_table(users_table, P_USERS)
-        posts_table[post_id]["time_upped"] = time.time()
-        wwf.save_table(posts_table, P_POSTS)
-        keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(telebot.types.InlineKeyboardButton(text="Поднять ✅", callback_data="noAnswer"))
-        tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-        mes.post_nm(ID_POST_CHANNEL, posts_table[post_id])
-        mes.error_message(call.message, "Поднято")
-        return
-
-    elif call_data_lowered[:7] == "report:":
-        post_id = call_data_lowered[7:]
-
-        posts_table = wwf.load_table(P_POSTS)
-        if (post_id not in posts_table) or (call.from_user.id in posts_table[post_id]["users_reported"]):
-            return
-
-        posts_table[post_id]["reported"] += 1
-        posts_table[post_id]["users_reported"].append(call.from_user.id)
-        if not posts_table[post_id]["report_was_sent"] and is_need_to_delete(posts_table[post_id]):
-            posts_table[post_id]["report_was_sent"] = True
+            users_table[user_id]["manual_ups"] -= 1
+            wwf.save_table(users_table, P_USERS)
+            posts_table[post_id]["time_upped"] = time.time()
             wwf.save_table(posts_table, P_POSTS)
-            mes.send_report_nm(call.message, ID_MANAGE_CHANNEL)
-            return
-        wwf.save_table(posts_table, P_POSTS)
-        mes.report_was_sent(call.from_user.id)
-        return
-
-    elif call_data_lowered[:7] == "verify:":
-        user_id = call_data_lowered[7:]
-
-        users_table = wwf.load_table(P_USERS)
-
-        users_table[user_id]["verification_request_was_sent"] = -1
-        users_table[user_id]["verified"] = True
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_verification_status(call.message, user_id, True)
-        return
-
-    elif call_data_lowered[:9] == "unverify:":
-        user_id = call_data_lowered[9:]
-
-        users_table = wwf.load_table(P_USERS)
-
-        users_table[user_id]["verification_request_was_sent"] = -1
-        users_table[user_id]["verified"] = False
-        wwf.save_table(users_table, P_USERS)
-        mes.edit_verification_status(call.message, user_id, False)
-        return
-
-    elif call_data_lowered[:12] == "delete_post:":
-        message_id = call_data_lowered[12:]
-
-        if call.message.chat.id == ID_MANAGE_CHANNEL:
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Удалено ✅", callback_data="noAnswer"))
+            keyboard.add(telebot.types.InlineKeyboardButton(text="Поднять ✅", callback_data="noAnswer"))
             tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
-
-            tb.delete_message(chat_id=ID_POST_CHANNEL, message_id=message_id)
+            mes.post_nm(ID_POST_CHANNEL, posts_table[post_id])
+            mes.error_message(call.message, "Поднято")
             return
 
-    elif call_data_lowered[:14] == "nodelete_post:":
-        message_id = call_data_lowered[14:]
+        elif call_data_lowered[:7] == "report:":
+            post_id = call_data_lowered[7:]
 
-        if call.message.chat.id == ID_MANAGE_CHANNEL:
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Не удалено ✅", callback_data="noAnswer"))
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+            posts_table = wwf.load_table(P_POSTS)
+            if (post_id not in posts_table) or (call.from_user.id in posts_table[post_id]["users_reported"]):
+                return
+
+            posts_table[post_id]["reported"] += 1
+            posts_table[post_id]["users_reported"].append(call.from_user.id)
+            if not posts_table[post_id]["report_was_sent"] and is_need_to_delete(posts_table[post_id]):
+                posts_table[post_id]["report_was_sent"] = True
+                wwf.save_table(posts_table, P_POSTS)
+                mes.send_report_nm(call.message, ID_MANAGE_CHANNEL)
+                return
+            wwf.save_table(posts_table, P_POSTS)
+            mes.report_was_sent(call.from_user.id)
             return
-    # Проверка на установленный код
-    try:
-        code = int(call.data)
 
-    except ValueError:
-        return
+        elif call_data_lowered[:7] == "verify:":
+            user_id = call_data_lowered[7:]
 
-    if 2000 > code > 1000:
+            users_table = wwf.load_table(P_USERS)
+
+            users_table[user_id]["verification_request_was_sent"] = -1
+            users_table[user_id]["verified"] = True
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_verification_status(call.message, user_id, True)
+            return
+
+        elif call_data_lowered[:9] == "unverify:":
+            user_id = call_data_lowered[9:]
+
+            users_table = wwf.load_table(P_USERS)
+
+            users_table[user_id]["verification_request_was_sent"] = -1
+            users_table[user_id]["verified"] = False
+            wwf.save_table(users_table, P_USERS)
+            mes.edit_verification_status(call.message, user_id, False)
+            return
+
+        elif call_data_lowered[:12] == "delete_post:":
+            message_id = call_data_lowered[12:]
+
+            if call.message.chat.id == ID_MANAGE_CHANNEL:
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Удалено ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+
+                tb.delete_message(chat_id=ID_POST_CHANNEL, message_id=message_id)
+                return
+
+        elif call_data_lowered[:14] == "nodelete_post:":
+            message_id = call_data_lowered[14:]
+
+            if call.message.chat.id == ID_MANAGE_CHANNEL:
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="Не удалено ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=keyboard)
+                return
+        # Проверка на установленный код
+        try:
+            code = int(call.data)
+
+        except ValueError:
+            return
+
+        if 2000 > code > 1000:
         page = code - 1000
         mes.send_posts_page(call.message, page)
         return
+
+    elif call.message.chat.id not in ALLOWED_GROUP_CHATS:
+
 
 
 @tb.message_handler()
@@ -2980,6 +2956,19 @@ def a():
             del dposts_table[key]
         wwf.save_table(dposts_table, P_D_POSTS)
         time.sleep(120)
+
+
+
+def add_category(user_id: str or int, category_id: str or int):
+    user_categories = db.get_user_categories(user_id)
+    user_categories += category_id + ","
+    db.set_use_categories(user_id, user_categories)
+
+
+def del_category(user_id: str or int):
+    user_categories = db.get_user_categories()
+    user_categories = ','.join(user_categories.split(",")[:-1])
+    db.set_use_categories(user_id, user_categories)
 
 
 Thread(target=a).start()

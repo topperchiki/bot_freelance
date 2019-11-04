@@ -834,7 +834,7 @@ def posted(message: types.Message, post_id):
     tb.send_message(text=text, chat_id=message.chat.id, reply_markup=keyboard)
 
 
-def error_message(message: types.Message, text: str):
+def text_message(message: types.Message, text: str):
     tb.send_message(text=text, chat_id=message.chat.id)
 
 
