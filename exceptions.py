@@ -1,0 +1,2 @@
+class FailedCallDatabase(Exception):
+    pass

@@ -3,8 +3,10 @@ TOKEN = '825727999:AAGTZPK2TRRWZID-rxXicGpFeAbd8dbMyrk'
 BOT_USERNAME = "bot_username"
 CONTACT_ACC_USERNAME = "google"
 ID_POST_CHANNEL = -243828263
+USERNAME_POST_CHANNEL = ""
 ID_MANAGE_CHANNEL = -243828263
 ALLOWED_GROUP_CHATS = {ID_POST_CHANNEL, ID_MANAGE_CHANNEL}
+ADMIN_IDS = {}
 
 # Payment
 PAYMENT_PROVIDER = '410694247:TEST:1496cc79-d856-44c4-9aa0-0271d717ca9f'
@@ -33,14 +35,21 @@ VERIFICATION_LINKS_LETTERS_LIMIT = 500
 
 
 # db info
-DB_NAME = 'database'
-DB_USER = 'db_user'
-DB_HOST = 'localhost'
-DB_PASS = 'mypassword'
+DB_NAME = 'test_db'
+DB_USER = 'testrole'
+DB_HOST = '127.0.0.1'
+DB_PASS = '123456'
 
 # text
-W_COMPLETE_EDITING = "Закончите редактирование"
-
+T_COMPLETE_EDITING = "Закончите редактирование"
+T_HELP = "Этот бот для канала " + ("@" + USERNAME_POST_CHANNEL if USERNAME_POST_CHANNEL else "с фриланс-работой") \
+         + ".\n\n/start - Вызвать начальное меню\n/myposts - Мои объявления\n\nЧтобы подать объявление нужно:\n" \
+           "1. В главном меню выбрать \"Новое объявление\"\n2. Выбрать исполнитель вы или заказчик\n" \
+           "3. Заполнить необходимые сведения\n4. Нажать кнопку \"Опубликовать\"\n\nОпубликованное объявление " \
+           "можно \"поднимать\". Для этого вы можете приобрести ручные подъемы (частота поднятия не чаще " \
+           "1 раза в 3 часа) или автоматические подъемы (актуальную информацию о покупке смотреть в меню покупки\n" \
+           "Чтобы купить подъемы, перейдите в списку объявлений, выберите нужно объявление и нажмите \"Купить " \
+           "подъемы\". Следуйте инструкциям"
 
 # NOT TO EDIT
 URL_CONTACT_ACC = "https://t.me/" + CONTACT_ACC_USERNAME
