@@ -2,7 +2,7 @@ from telebot import types
 import db
 from bot import tb
 from constants import *
-
+import os
 import time
 from telebot.types import LabeledPrice
 
@@ -17,10 +17,15 @@ def main_menu_building(user_id: str or int):
     mark_up = types.InlineKeyboardMarkup(row_width=2)
     mark_up.add(types.InlineKeyboardButton('Мои объявления: ' + str(count), callback_data='postpage:1'),
                 types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
-    mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"))
+    mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"),
+                types.InlineKeyboardButton('Пригласить друга', callback_data="referal"))
 
     return text, mark_up
 
+def generate_referal(user_id,chat_id):
+    code = 'https://t.me/Mytoserbot?start='.join([hex(ord(c)).replace('0x','') for c in os.urandom(8)])
+    sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! ' + code
+    tb.send_message(chat_id, 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! ')
 
 def side_menu_building():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -30,7 +35,9 @@ def side_menu_building():
     keyboard.add(a, b, c)
     text = "Выберите тип"
     return text, keyboard
-
+def take_text_mes(message):
+    text = message.text
+    return text
 
 def gen_keyboard_listing(now: int, num_all_pages: int):
     data = []
