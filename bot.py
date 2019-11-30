@@ -1,7 +1,7 @@
 #
 import work_with_files as wwf
 from constants import *
-import zMessage as mes
+import messages as mes
 import db
 from exceptions import *
 
