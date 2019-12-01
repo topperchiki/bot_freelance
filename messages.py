@@ -9,7 +9,6 @@ from telebot.types import LabeledPrice
 
 # Building
 def main_menu_building(user_id: str or int):
-    db.set_user_step(user_id, 0)
     count = db.get_count_user_posts(user_id)
 
     text = "Главное меню"
@@ -74,7 +73,6 @@ def gen_keyboard_listing(now: int, num_all_pages: int):
 
 
 def nice_time(time_value: int):
-    sec = time_value % 60
     minutes = time_value % 3600
     hours = time_value % 216000
     days = time_value % 12960000
@@ -171,14 +169,14 @@ def main_menu(chat_id: str or int, message_id: str or int, user_id: str or int):
 def side_menu_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 2)
 
-    text, kb = side_menu_building(user_id)
+    text, kb = side_menu_building()
     tb.send_message(chat_id, text, reply_markup=kb)
 
 
 def side_menu(chat_id: str or int, message_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 2)
 
-    text, kb = side_menu_building(user_id)
+    text, kb = side_menu_building()
     tb.edit_message_text(text, chat_id, message_id, reply_markup=kb)
 
 
@@ -200,7 +198,7 @@ def send_posts_page_nm(chat_id: str or int, user_id: str or int, page: int):
     tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
 
 
-def post_doesnt_exist_message(message: types.Message):
+def post_doesnt_exist_message(chat_id: str or int):
     tb.send_message(text="Объявления с таким id не существует\nФормат запроса /id_postЧисло", chat_id=chat_id)
 
 

@@ -16,6 +16,7 @@ from threading import Thread
 
 tb = telebot.TeleBot(TOKEN)
 
+
 @tb.message_handler(commands=['start'])
 def start_menu(message: telebot.types.Message):
     with open(P_ACTIONS, "a") as f:
@@ -258,7 +259,7 @@ def query_handler(call):
             post_type = (1 if call_data_lowered[10:12] == "fr" else 2)
 
             if post_type == 1:
-                if user_step not in POSSIBLE_COME_TO_PORTFOLIO_FR:
+                if user_step not in POSSIBLE_COME_TO_SKIP_PORTFOLIO:
                     return
             elif post_type == 2:
                 if user_step not in POSSIBLE_COME_TO_PORTFOLIO_CU:
@@ -307,31 +308,31 @@ def query_handler(call):
                 new_id = random.randint(100000, 999999)
 
             new_id = str(new_id)
-            # TODO FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-            ans = mes.post_nm(ID_POST_CHANNEL, users_table[user_id]["freelance_post"])
-            posts_table[new_id] = users_table[user_id]["freelance_post"]
-            posts_table[new_id]["time_published"] = time.time()
-            posts_table[new_id]["time_upped"] = posts_table[new_id]["time_published"]
-            ownership_table[user_id].append(new_id)
-            wwf.save_table(ownership_table, P_OWNERSHIPS)
-
-            posts_table[new_id]["published"] = True
-
-            wwf.save_table(posts_table, P_POSTS)
-            dposts_table = wwf.load_table(P_D_POSTS)
-            t = posts_table[new_id]["time_published"] + 169200
-            if t in dposts_table:
-                dposts_table[t].append({"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0})
-            else:
-                dposts_table[t] = [{"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0}]
-            wwf.save_table(dposts_table, P_D_POSTS)
-
-            keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-            keyboard.add(telebot.types.InlineKeyboardButton(text="Опубликовано ✅", callback_data="noAnswer"))
-            tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                         reply_markup=keyboard)
-            mes.posted(call.message, new_id)
-            return
+            # # TODO FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+            # ans = mes.post_nm(ID_POST_CHANNEL, users_table[user_id]["freelance_post"])
+            # posts_table[new_id] = users_table[user_id]["freelance_post"]
+            # posts_table[new_id]["time_published"] = time.time()
+            # posts_table[new_id]["time_upped"] = posts_table[new_id]["time_published"]
+            # ownership_table[user_id].append(new_id)
+            # wwf.save_table(ownership_table, P_OWNERSHIPS)
+            #
+            # posts_table[new_id]["published"] = True
+            #
+            # wwf.save_table(posts_table, P_POSTS)
+            # dposts_table = wwf.load_table(P_D_POSTS)
+            # t = posts_table[new_id]["time_published"] + 169200
+            # if t in dposts_table:
+            #     dposts_table[t].append({"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0})
+            # else:
+            #     dposts_table[t] = [{"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0}]
+            # wwf.save_table(dposts_table, P_D_POSTS)
+            #
+            # keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+            # keyboard.add(telebot.types.InlineKeyboardButton(text="Опубликовано ✅", callback_data="noAnswer"))
+            # tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
+            #                              reply_markup=keyboard)
+            # mes.posted(call.message, new_id)
+            # return
 
         elif call_data_lowered[:8] == "postpage":
             page = call_data_lowered[9:]
@@ -344,82 +345,83 @@ def query_handler(call):
             mes.send_posts_page(chat_id, message_id, user_id, page)
             return
 
-        elif call_data_lowered == "verification":
-
-        elif call_data_lowered == "payverification":
-
-        elif call_data_lowered[:14] == "buyingupsmenu":
-
-        elif call_data_lowered[:14] == "buyingautoups":
-
-        elif call_data_lowered[:18] == "buyingautoupsmode":
-
-        elif call_data_lowered[:16] == "buyingmanualups":
-
-        elif call_data_lowered[:8] == "getpost":
-
-        elif call_data_lowered[:2] == "up":
-
-        elif call_data_lowered[:4] == "edit":
-            left_part = call_data_lowered[4:]
-            if left_part == "title":
-
-            elif left_part == "guarantee_yes":
-
-            elif left_part == "guarantee_no":
-
-            elif left_part == "portfolio_yes":
-
-            elif left_part == "portfolio_no":
-
-            elif left_part == "description":
-
-            elif left_part == "memo":
-
-            elif left_part == "portfolio":
-
-            elif left_part == "guarantee":
-
-            elif left_part == "contacts":
-
-            elif left_part == "categories":
-
-            elif left_part == "categories_1":
-
-            elif left_part == "categories_b":
-
-            elif left_part == "portfolio_delete":
-
-            elif left_part == "pay_type1":
-
-            elif left_part == "pay_type2":
-
-            elif left_part == "pay_type3":
-
-            elif left_part == "payment":
-
-        elif call_data_lowered[:8] == "edit_pbp":
-            left_part = call_data_lowered[9:]
-            if left_part == "menu":
-            elif left_part[:10] == "categories":
-                if left_part[11] == "n":
-                elif left_part[11] == "b":
-            elif left_part == "title":
-            elif left_part == "description":
-            elif left_part == "memo":
-            elif left_part == "portfolio":
-            elif left_part == "no_portfolio":
-            elif left_part == "contacts":
-            elif left_part == "payment":
-            elif left_part == "payment_type":
-            elif left_part == "payment_type_2_fr:":
-            elif left_part == "price":
-            elif left_part == "price_2":
-            elif left_part == "guarantee":
-            elif left_part == "guarantee_yes":
-            elif left_part == "guarantee_no":
+        # elif call_data_lowered == "verification":
+        #
+        # elif call_data_lowered == "payverification":
+        #
+        # elif call_data_lowered[:14] == "buyingupsmenu":
+        #
+        # elif call_data_lowered[:14] == "buyingautoups":
+        #
+        # elif call_data_lowered[:18] == "buyingautoupsmode":
+        #
+        # elif call_data_lowered[:16] == "buyingmanualups":
+        #
+        # elif call_data_lowered[:8] == "getpost":
+        #
+        # elif call_data_lowered[:2] == "up":
+        #
+        # elif call_data_lowered[:4] == "edit":
+        #     left_part = call_data_lowered[4:]
+        #     if left_part == "title":
+        #
+        #     elif left_part == "guarantee_yes":
+        #
+        #     elif left_part == "guarantee_no":
+        #
+        #     elif left_part == "portfolio_yes":
+        #
+        #     elif left_part == "portfolio_no":
+        #
+        #     elif left_part == "description":
+        #
+        #     elif left_part == "memo":
+        #
+        #     elif left_part == "portfolio":
+        #
+        #     elif left_part == "guarantee":
+        #
+        #     elif left_part == "contacts":
+        #
+        #     elif left_part == "categories":
+        #
+        #     elif left_part == "categories_1":
+        #
+        #     elif left_part == "categories_b":
+        #
+        #     elif left_part == "portfolio_delete":
+        #
+        #     elif left_part == "pay_type1":
+        #
+        #     elif left_part == "pay_type2":
+        #
+        #     elif left_part == "pay_type3":
+        #
+        #     elif left_part == "payment":
+        #
+        # elif call_data_lowered[:8] == "edit_pbp":
+        #     left_part = call_data_lowered[9:]
+        #     if left_part == "menu":
+        #     elif left_part[:10] == "categories":
+        #         if left_part[11] == "n":
+        #         elif left_part[11] == "b":
+        #     elif left_part == "title":
+        #     elif left_part == "description":
+        #     elif left_part == "memo":
+        #     elif left_part == "portfolio":
+        #     elif left_part == "no_portfolio":
+        #     elif left_part == "contacts":
+        #     elif left_part == "payment":
+        #     elif left_part == "payment_type":
+        #     elif left_part == "payment_type_2_fr:":
+        #     elif left_part == "price":
+        #     elif left_part == "price_2":
+        #     elif left_part == "guarantee":
+        #     elif left_part == "guarantee_yes":
+        #     elif left_part == "guarantee_no":
 
     elif call.chat.type == "group" and chat_id in ALLOWED_GROUP_CHATS:
+        pass
 
 
 @tb.message_handler(commands=['help'])
@@ -487,7 +489,6 @@ def all_left_commands(message: telebot.types.Message):
         if chat_id in ADMIN_IDS:
             command = message.text.lower()
             handle_admin_command(command, chat_id, message_id, user_id)
-
 
     elif message.chat.type == "public":
 
@@ -574,22 +575,23 @@ def handle_admin_command(command: str, chat_id: str or int, message_id: str or i
 #
 def auto_actions():
     while True:
-        actions = db.get_avaible_auto_actions(time.time())
+        actions = db.get_available_auto_actions(time.time())
         # [0] action_type
-        #   1 [1] post_id, counts, plus_time, rate_id
-        #   2 [1] message_id
+        #   1 [1] post_id, counts, plus_time, rate_id, [5] message_id
 
         for action in actions:
             if action[0] == 1:
                 mes.send_post(ID_POST_CHANNEL, action[1])
+                tt = time.time()
+                db.set_post_last_up_and_counts(action[1], tt, action[2] - 1)
                 if action[2] > 1:
-                    db.set_next_post_up_in_auto_post(action[1], action[2], time.time() + action[3])
+                    db.set_next_post_up_in_auto_post(action[1], action[2] - 1, tt + action[3])
                 else:
                     db.delete_auto_action_with_post_id(action[1])
 
             elif actions[0] == 2:
-                tb.edit_message_reply_markup(chat_id=ID_POST_CHANNEL, message_id=action[1])
-                db.delete_auto_action_with_message_id(action[1])
+                tb.edit_message_reply_markup(chat_id=ID_POST_CHANNEL, message_id=action[5])
+                db.delete_auto_action_with_message_id(action[5])
         time.sleep(120)
 
 

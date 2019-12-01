@@ -221,9 +221,103 @@ def delete_user_posts(user_id: str or int):
 @d_db_empty
 def get_user_posts(user_id: str or int):
     global cursor
-    cursor.execute("SELECT FROM users() SWHERE user_id = %s", (str(user_id)))  #TODO Что нужно?
+    cursor.execute("SELECT FROM users() WHERE user_id = %s", (str(user_id)))  #TODO Что нужно?
 
 
+@d_db_exist
+def get_user_steps_if_exists(user_id: str or int):
+    global cursor
+    cursor.execute("SELECT step FROM users WHERE user_id = %s", (str(user_id)))
     
-    
 
+@d_db_empty
+def set_user_step(user_id: str or int, step: int or str):
+    global cursor
+    cursor.execute("UPDATE users SET step = %s WHERE user_id = %s", (str(step), str(user_id)))
+
+
+@d_db_one
+def get_count_user_posts(user_id: str or int):
+    global cursor
+    cursor.execute("SELECT post_id FROM posts WHERE owner_id = %s", (str(user_id)))
+
+
+@d_db_one
+def get_post_info(post_id: str or int):
+    # type, title, category, time_last_up, rate_id, auto_ups
+    global cursor
+    cursor.execute("SELECT type, title, categories, last_up, rate_id, auto_ups FROM posts WHERE post_id = %s", (str(post_id)))
+
+
+@d_db_one
+def get_category_hashtag(category_id: str or int):
+    global cursor
+    cursor.execute("SELECT hashtag FROM categories WHERE category_id = %s", (str(category_id)))
+
+
+@d_db_one
+def get_rate_time(rate_id: str or int):
+    54
+
+
+@d_db_one
+def get_user_manual_ups(user_id: str or int):
+    global cursor
+    cursor.execute("SELECT manual_ups FROM users WHERE user_id = %s", (str(user_id)))
+
+
+@d_db_one
+def get_category_children_if_exists(category_id: str or int):
+    global cursor
+    cursor.execute("SELECT children_count FROM categories WHERE category_id = %s", (str(category_id)))
+
+
+@d_db_one
+def get_category_name(category_id: str or int):
+    global cursor
+    cursor.execute("SELECT name FROM categories WHERE category_id = %s", (str(category_id)))
+
+
+@d_db_empty
+def set_post_last_up(post_id: str or int, update_time: str or int):
+    global cursor
+    cursor.execute("UPDATE posts SET last_up = %s WHERE post_id = %s", (str(update_time), str(post_id)))
+
+
+@d_db_all
+def get_available_auto_actions(time_to_check: int or str):
+    global cursor
+    cursor.execute("SELECT action_type, post_id, counts, plus_time, rate_id, message_id"
+                   "FROM auto_actions WHERE time_to_do < %s", (str(time_to_check)))
+
+
+@d_db_empty
+def set_next_post_up_in_auto_post(post_id: str or int, counts: int or str, new_time: int or str):
+    global cursor
+    cursor.execute("UPDATE auto_actions SET count = %s, time_to_do = %s WHERE post_id = %s",
+                   (str(counts), str(new_time), str(post_id)))
+
+
+@d_db_empty
+def delete_auto_action_with_post_id(post_id: str or int):
+    global cursor
+    cursor.execute("DELETE FROM auto_actions WHERE post_id = %s", (str(post_id)))
+
+
+@d_db_empty
+def delete_auto_action_with_message_id(message_id: str or int):
+    global cursor
+    cursor.execute("DELETE FROM auto_actions WHERE message_id = %s", (str(message_id)))
+
+
+@d_db_empty
+def set_post_last_up_and_counts(post_id: str or int, update_time: str or int, auto_ups: str or int):
+    global cursor
+    cursor.execute("UPDATE posts SET last_up = %s, auto_ups = %s WHERE post_id = %s",
+                   (str(update_time), str(post_id), str(auto_ups)))
+
+
+@d_db_empty
+def set_user_verification_status(user_id: str or int, value: bool):
+    global cursor
+    cursor.execute("UPDATE users SET verified = %s WHERE user_id = %s", (str(value), str(user_id)))
