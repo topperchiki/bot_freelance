@@ -22,10 +22,19 @@ def start_menu(message: telebot.types.Message):
     with open(P_ACTIONS, "a") as f:
         f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ",
                               time.gmtime(time.time())) + str(message.chat.id) + " " + message.text + "\n")
-
+    chat_id = message.chat.id
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
+    if message.text>7 :
+        ref_code = message.text[8:]
+        db.add_point_to_ref(user_id)#TODO +1 человек к приглашенным
+        if db.poin_to_ref(user_id):
+            #даём один ручной ап
+            pass
 
+    if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
+        mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
+        return
     if not user_step:
         db.add_user(user_id)
         user_step = 0
@@ -52,7 +61,9 @@ def query_handler(call):
     if not user_step:
         db.add_user(user_id)
         user_step = 0
-
+    if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
+        mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
+        return
     call_data_lowered = call.data.lower()
     if call_data_lowered == "noanswer":
         return
@@ -74,6 +85,9 @@ def query_handler(call):
                 return
 
             mes.paid_service_menu(chat_id, message_id, user_id)
+            return
+        elif call_data_lowered == "referal":
+            mes.generate_referal(user_id,chat_id)
             return
 
         elif call_data_lowered == "createpost":
@@ -507,6 +521,7 @@ def handle_admin_command(command: str, chat_id: str or int, message_id: str or i
 
         try:
             user_id_to_unverify = int(user_id_to_unverify)
+
         except ValueError:
             mes.text_message(chat_id, "Неверный формат id")
             return
@@ -535,8 +550,18 @@ def handle_admin_command(command: str, chat_id: str or int, message_id: str or i
         pass
 
     elif command[:9] == "/ban_user":
-        pass
+        user_id_to_ban = command[10:]
+        if user_id_to_ban[-1] == "]":
+            user_id_to_ban = user_id_to_ban[:-1]
+        try:
+            user_id_to_ban = int(user_id_to_ban)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return
 
+        db.give_user_ban(user_id_to_ban)  #Todo присвоить данному айди статус "banned" для оптимизации можно удалить всю остальную информацию, можно не трогать
+        mes.text_message(chat_id, "Пользователь успешно забанен, его объявления удалены, автоподьемы обнулены, доступ к платформе заблокирован ")
+        return
     elif command[:12] == "/delete_user":
         pass
 
@@ -557,7 +582,22 @@ def handle_admin_command(command: str, chat_id: str or int, message_id: str or i
 
     elif command[:18] == "/set_referral_code":
         # До 30 символов! (включительно)
-        pass
+        user_id_to_ref = command[19:]
+        if user_id_to_ref[-1] == "]":
+            user_id_to_ban = user_id_to_ref[:-1]
+        try:
+            user_id_to_ref = int(user_id_to_ref)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return
+        mes.text_message(chat_id,
+                         "Отправьте пожалуйста код для реферальной ссылки")
+        code = mes.take_text_mes()
+        db.give_user_ref(
+            user_id_to_ref,code)  # Todo пихнуть код в бд
+        mes.text_message(chat_id,
+                         "Пользователю успешно присвоен реферальный код ")
+        return
 
     elif command[:11] == "/list_posts":
         pass
