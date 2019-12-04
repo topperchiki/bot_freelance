@@ -64,6 +64,21 @@ def d_db_exist(fn):
     return f
 
 
+# decorator
+def d_db_all_exist(fn):
+    def f(*args, **kwargs):
+        conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
+                                password=DB_PASS, host=DB_HOST)
+        cursor = conn.cursor()
+        cursor.execute(*fn(*args, **kwargs))
+        result = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return result[0]
+
+    return f
+
+
 @d_db_one
 def user_posts(user_id: str):
     return "SELECT posts FROM posts WHERE owner_id = ?", (int(user_id), )
@@ -242,7 +257,7 @@ def set_post_last_up(post_id: str or int, update_time: str or int):
     return "UPDATE posts SET last_up = %s WHERE post_id = %s", (str(update_time), str(post_id))
 
 
-@d_db_all
+@d_db_all_exist
 def get_available_auto_actions(time_to_check: int or str):
     return "SELECT action_type, post_id, counts, plus_time, rate_id, message_id " \
            "FROM auto_actions WHERE time_to_do < %s", (str(int(time_to_check)),)
