@@ -59,7 +59,7 @@ def d_db_exist(fn):
         result = cursor.fetchone()
         cursor.close()
         conn.close()
-        return result[0]
+        return result[0] if result else ()
 
     return f
 
@@ -74,7 +74,7 @@ def d_db_all_exist(fn):
         result = cursor.fetchall()
         cursor.close()
         conn.close()
-        return result[0]
+        return result[0] if result else ()
 
     return f
 
