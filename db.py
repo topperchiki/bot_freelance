@@ -244,7 +244,7 @@ def set_post_last_up(post_id: str or int, update_time: str or int):
 @d_db_all
 def get_available_auto_actions(time_to_check: int or str):
     return "SELECT action_type, post_id, counts, plus_time, rate_id, message_id " \
-           "FROM auto_actions WHERE time_to_do < %s", str(time_to_check)
+           "FROM auto_actions WHERE time_to_do < %s", (str(time_to_check))
 
 
 @d_db_empty

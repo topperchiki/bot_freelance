@@ -114,6 +114,7 @@ def main_setup(db_name, db_user, db_pass, db_host="localhost"):
     conn = psycopg2.connect(dbname=db_name, user=db_user,
                             password=db_pass, host=db_host)
     print("Создание таблиц")
+    print(type(conn))
     create_users_table(conn)
     create_posts_table(conn)
     create_rates_table(conn)
