@@ -81,17 +81,17 @@ def d_db_all_exist(fn):
 
 @d_db_one
 def user_posts(user_id: str):
-    return "SELECT posts FROM posts WHERE owner_id = ?", (int(user_id), )
+    return "SELECT posts FROM posts WHERE owner_id = %s", (int(user_id), )
 
 
 @d_db_one
 def get_user_step(user_id: str):
-    return "SELECT step FROM users WHERE user_id = ?", (int(user_id), )
+    return "SELECT step FROM users WHERE user_id = %s", (int(user_id), )
 
 
 @d_db_empty
 def add_user(user_id: str, data_added: str or int):
-    return "INSERT INTO users(user_id, date_added) VALUES (?, ?)", (int(user_id), str(data_added))
+    return "INSERT INTO users (user_id, date_added) VALUES (%s, %s)", (int(user_id), str(data_added))
 
 
 @d_db_one
@@ -177,7 +177,7 @@ def clear_queue_with_the_rate(rate_id: str or int):
 
 @d_db_empty
 def add_rate(rate_id: str or int, update_time: str or int, price: str or int):
-    return "INSERT INTO rates(rate_id, update_time, price) VALUES (?, ?, ?)",\
+    return "INSERT INTO rates(rate_id, update_time, price) VALUES (%s, %s, %s)",\
            (str(rate_id), str(update_time), str(price))
 
 
