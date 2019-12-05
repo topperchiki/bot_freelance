@@ -43,7 +43,7 @@ def start_menu(message: telebot.types.Message):
         if user_step == 29:
             mes.text_message(message, T_COMPLETE_EDITING)
             return
-        mes.main_menu_nm(message.chat.id)
+        mes.main_menu_nm(message.chat.id, user_id)
         return
 
 
