@@ -26,16 +26,16 @@ def start_menu(message: telebot.types.Message):
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
 
-    if message.text > 7:
-        ref_code = message.text[8:]
-        db.add_point_to_ref(user_id)#TODO +1 человек к приглашенным
-        if db.poin_to_ref(user_id):
-            #даём один ручной ап
-            pass
-
-    if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
-        mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
-        return
+    # if message.text>7 :
+    #     ref_code = message.text[8:]
+    #     db.add_point_to_ref(user_id)#TODO +1 человек к приглашенным
+    #     if db.poin_to_ref(user_id):
+    #         #даём один ручной ап
+    #         pass
+    #
+    # if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
+    #     mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
+    #     return
 
     if isinstance(user_step, bool) and not user_step:
         db.add_user(user_id, int(time.time()))
@@ -45,7 +45,7 @@ def start_menu(message: telebot.types.Message):
         if user_step == 29:
             mes.text_message(message, T_COMPLETE_EDITING)
             return
-        mes.main_menu_nm(message.chat.id, user_id)
+        mes.main_menu_nm(chat_id, user_id)
         return
 
 
@@ -59,14 +59,14 @@ def query_handler(call):
     chat_id = call.chat.id
     message_id = call.message.message_id
     user_step = db.get_user_steps_if_exists(user_id)
-    
+
     if isinstance(user_step, bool) and not user_step:
         db.add_user(user_id, int(time.time()))
         user_step = 0
-        
-    if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
-        mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
-        return
+
+    # if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
+    #     mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
+    #     return
 
     call_data_lowered = call.data.lower()
     if call_data_lowered == "noanswer":
