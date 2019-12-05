@@ -35,7 +35,7 @@ def start_menu(message: telebot.types.Message):
     if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
         mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
         return
-    if not user_step:
+    if user_step == False:
         db.add_user(user_id, int(time.time()))
         user_step = 0
 
@@ -58,7 +58,7 @@ def query_handler(call):
     message_id = call.message.message_id
     user_step = db.get_user_steps_if_exists(user_id)
 
-    if not user_step:
+    if user_step == False:
         db.add_user(user_id, int(time.time()))
         user_step = 0
     if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
@@ -447,7 +447,7 @@ def help_and_tips(message: telebot.types.Message):
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
 
-    if not user_step:
+    if user_step == False:
         db.add_user(user_id, int(time.time()))
         user_step = 0
 
@@ -468,7 +468,7 @@ def help_and_tips(message: telebot.types.Message):
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
 
-    if not user_step:
+    if user_step == False:
         db.add_user(user_id, int(time.time()))
         user_step = 0
 
@@ -491,7 +491,7 @@ def all_left_commands(message: telebot.types.Message):
     chat_id = message.chat.id
     message_id = message.message_id
 
-    if not user_step:
+    if user_step == False:
         db.add_user(user_id, int(time.time()))
         user_step = 0
 
