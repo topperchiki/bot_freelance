@@ -54,7 +54,7 @@ def query_handler(call):
                               time.gmtime(time.time())) + str(call.message.chat.id) + " " + call.data + "\n")
 
     user_id = call.from_user.id
-    chat_id = call.chat.id
+    chat_id = call.message.chat.id
     message_id = call.message.message_id
     user_step = db.get_user_steps_if_exists(user_id)
 
@@ -68,7 +68,7 @@ def query_handler(call):
     if call_data_lowered == "noanswer":
         return
 
-    elif call.chat.type == "private":
+    elif call.message.chat.type == "private":
 
         if call_data_lowered == "mainmenu":
             mes.main_menu_nm(chat_id, user_id)
