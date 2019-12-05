@@ -36,7 +36,7 @@ def start_menu(message: telebot.types.Message):
         mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
         return
     if not user_step:
-        db.add_user(user_id)
+        db.add_user(user_id, time.time())
         user_step = 0
 
     if message.chat.type == 'private':
