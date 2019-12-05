@@ -12,6 +12,8 @@ def main_menu_building(user_id: str or int):
 
     if isinstance(count, bool) and not count:
         count = 0
+    else:
+        count = len(count)
 
     text = "Главное меню"
 
