@@ -10,6 +10,9 @@ import time
 def main_menu_building(user_id: str or int):
     count = db.get_count_user_posts(user_id)
 
+    if isinstance(count, bool) and not count:
+        count = 0
+
     text = "Главное меню"
 
     mark_up = types.InlineKeyboardMarkup(row_width=2)
