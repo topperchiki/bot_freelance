@@ -217,7 +217,7 @@ def set_user_step(user_id: str or int, step: int or str):
     return "UPDATE users SET step = %s WHERE user_id = %s", (str(step), str(user_id))
 
 
-@d_db_one
+@d_db_all_exist
 def get_count_user_posts(user_id: str or int):
     return "SELECT post_id FROM posts WHERE owner_id = %s", (str(user_id), )
 
