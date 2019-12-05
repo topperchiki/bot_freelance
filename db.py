@@ -85,12 +85,12 @@ def user_posts(user_id: str):
 
 
 @d_db_one
-def get_user_step(user_id: str):
+def get_user_step(user_id: str or int):
     return "SELECT step FROM users WHERE user_id = %s", (int(user_id), )
 
 
 @d_db_empty
-def add_user(user_id: str, data_added: str or int):
+def add_user(user_id: str or int, data_added: str or int):
     return "INSERT INTO users (user_id, date_added) VALUES (%s, %s)", (int(user_id), str(data_added))
 
 
