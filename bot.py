@@ -25,7 +25,8 @@ def start_menu(message: telebot.types.Message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
-    if message.text>7 :
+
+    if message.text > 7:
         ref_code = message.text[8:]
         db.add_point_to_ref(user_id)#TODO +1 человек к приглашенным
         if db.poin_to_ref(user_id):
@@ -35,6 +36,7 @@ def start_menu(message: telebot.types.Message):
     if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
         mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
         return
+
     if isinstance(user_step, bool) and not user_step:
         db.add_user(user_id, int(time.time()))
         user_step = 0
@@ -65,6 +67,7 @@ def query_handler(call):
     if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
         mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
         return
+
     call_data_lowered = call.data.lower()
     if call_data_lowered == "noanswer":
         return
@@ -207,7 +210,6 @@ def query_handler(call):
             if pay_type < 1 or pay_type > 3:
                 mes.text_message(chat_id, "Неверный тип цены")
                 return
-
 
             db.set_user_payment_type(user_id, pay_type)
             if pay_type == 1:
