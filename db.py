@@ -15,7 +15,7 @@ def d_db_one(fn):
         conn.close()
         if not result:
             raise FailedCallDatabase
-        return result[0]
+        return result
 
     return f
 
@@ -32,7 +32,7 @@ def d_db_all(fn):
         conn.close()
         if not result:
             raise FailedCallDatabase
-        return result[0]
+        return result
     return f
 
 
@@ -59,7 +59,7 @@ def d_db_exist(fn):
         result = cursor.fetchone()
         cursor.close()
         conn.close()
-        return result[0] if result else ()
+        return result if result else ()
 
     return f
 
@@ -74,7 +74,7 @@ def d_db_all_exist(fn):
         result = cursor.fetchall()
         cursor.close()
         conn.close()
-        return result[0] if result else ()
+        return result if result else ()
 
     return f
 
@@ -202,9 +202,9 @@ def delete_user_posts(user_id: str or int):
     #TODO Очищать очередь от удаленных объявлений, удалять реферальные коды
 
 
-@d_db_all
+@d_db_all_exist
 def get_user_posts(user_id: str or int):
-    return "SELECT FROM users() WHERE user_id = %s", (str(user_id), )
+    return "SELECT FROM users WHERE user_id = %s", (str(user_id), )
 
 
 @d_db_exist

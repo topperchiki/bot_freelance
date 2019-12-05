@@ -25,6 +25,7 @@ def start_menu(message: telebot.types.Message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
+
     # if len(message.text) > 7 :
     #     ref_code = message.text[8:]
     #     db.add_point_to_ref(user_id)#TODO +1 человек к приглашенным
@@ -35,9 +36,12 @@ def start_menu(message: telebot.types.Message):
     # if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
     #     mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
     #     return
-    if isinstance(user_step, bool) and not user_step:
+
+    if len(user_step) == 0:
         db.add_user(user_id, int(time.time()))
         user_step = 0
+    else:
+        user_step = user_step[0]
 
     if message.chat.type == 'private':
         if user_step == 29:
@@ -58,12 +62,16 @@ def query_handler(call):
     message_id = call.message.message_id
     user_step = db.get_user_steps_if_exists(user_id)
 
-    if isinstance(user_step, bool) and not user_step:
+    if len(user_step) == 0:
         db.add_user(user_id, int(time.time()))
         user_step = 0
+    else:
+        user_step = user_step[0]
+
     # if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
     #     mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
     #     return
+
     call_data_lowered = call.data.lower()
     if call_data_lowered == "noanswer":
         return
@@ -447,9 +455,11 @@ def help_and_tips(message: telebot.types.Message):
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
 
-    if isinstance(user_step, bool) and not user_step:
+    if len(user_step) == 0:
         db.add_user(user_id, int(time.time()))
         user_step = 0
+    else:
+        user_step = user_step[0]
 
     if message.chat.type == 'private':
         if user_step == 29:
@@ -468,9 +478,11 @@ def help_and_tips(message: telebot.types.Message):
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
 
-    if isinstance(user_step, bool) and not user_step:
+    if len(user_step) == 0:
         db.add_user(user_id, int(time.time()))
         user_step = 0
+    else:
+        user_step = user_step[0]
 
     if message.chat.type == 'private':
         if user_step == 29:
@@ -491,9 +503,11 @@ def all_left_commands(message: telebot.types.Message):
     chat_id = message.chat.id
     message_id = message.message_id
 
-    if isinstance(user_step, bool) and not user_step:
+    if len(user_step) == 0:
         db.add_user(user_id, int(time.time()))
         user_step = 0
+    else:
+        user_step = user_step[0]
 
     if message.chat.type == 'private':
         if user_step == 29:

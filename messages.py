@@ -8,12 +8,7 @@ import time
 
 # Building
 def main_menu_building(user_id: str or int):
-    count = db.get_count_user_posts(user_id)
-
-    if isinstance(count, bool) and not count:
-        count = 0
-    else:
-        count = len(count)
+    count = len(db.get_count_user_posts(user_id))
 
     text = "Главное меню"
 
@@ -26,7 +21,7 @@ def main_menu_building(user_id: str or int):
     return text, mark_up
 
 
-def generate_referal(user_id,chat_id):
+def generate_referral(user_id, chat_id):
     code = 'https://t.me/Mytoserbot?start='.join([hex(ord(c)).replace('0x','') for c in os.urandom(8)])
     sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! ' + code
     tb.send_message(chat_id, 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! ')
