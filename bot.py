@@ -36,7 +36,7 @@ def start_menu(message: telebot.types.Message):
         mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
         return
     if not user_step:
-        db.add_user(user_id, time.time())
+        db.add_user(user_id, int(time.time()))
         user_step = 0
 
     if message.chat.type == 'private':
@@ -59,7 +59,7 @@ def query_handler(call):
     user_step = db.get_user_steps_if_exists(user_id)
 
     if not user_step:
-        db.add_user(user_id, time.time())
+        db.add_user(user_id, int(time.time()))
         user_step = 0
     if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
         mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
@@ -448,7 +448,7 @@ def help_and_tips(message: telebot.types.Message):
     user_step = db.get_user_steps_if_exists(user_id)
 
     if not user_step:
-        db.add_user(user_id, time.time())
+        db.add_user(user_id, int(time.time()))
         user_step = 0
 
     if message.chat.type == 'private':
@@ -469,7 +469,7 @@ def help_and_tips(message: telebot.types.Message):
     user_step = db.get_user_steps_if_exists(user_id)
 
     if not user_step:
-        db.add_user(user_id, time.time())
+        db.add_user(user_id, int(time.time()))
         user_step = 0
 
     if message.chat.type == 'private':
@@ -492,7 +492,7 @@ def all_left_commands(message: telebot.types.Message):
     message_id = message.message_id
 
     if not user_step:
-        db.add_user(user_id, time.time())
+        db.add_user(user_id, int(time.time()))
         user_step = 0
 
     if message.chat.type == 'private':
