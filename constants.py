@@ -35,10 +35,10 @@ VERIFICATION_LINKS_LETTERS_LIMIT = 500
 
 
 # db info
-DB_NAME = 'test_db'
-DB_USER = 'testrole'
-DB_HOST = '127.0.0.1'
-DB_PASS = '123456'
+DB_NAME = 'tg_bot_fr'
+DB_USER = 'tg_freelance_bot'
+DB_HOST = '82.118.21.77'
+DB_PASS = '12345'
 
 # text
 T_COMPLETE_EDITING = "Закончите редактирование"
