@@ -1,4 +1,6 @@
 import psycopg2
+import db
+import json
 
 
 def create_auto_actions_table(connection: psycopg2.extensions.connection):
@@ -19,7 +21,7 @@ def create_post_prepare_table(connection: psycopg2.extensions.connection):
     cursor = connection.cursor()
     cursor.execute('''CREATE TABLE post_prepare(
                                 user_id INT UNIQUE NOT NULL,
-                                type INT NOT NULL,
+                                type INT NOT NULL DEFAULT 1,
                                 title VARCHAR(50),
                                 description VARCHAR(50), 
                                 memo VARCHAR(350),
@@ -100,6 +102,7 @@ def create_users_table(connection: psycopg2.extensions.connection):
                                 date_added INT NOT NULL,
                                 
                                 step INT NOT NULL DEFAULT 0,
+                                user_posts_count INT NOT NULL DEFAULT 0,
                                 manual_ups INT NOT NULL DEFAULT 0,
                                 spent_money INT NOT NULL DEFAULT 0,
                                 verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -113,18 +116,39 @@ def create_users_table(connection: psycopg2.extensions.connection):
 def main_setup(db_name, db_user, db_pass, db_host="localhost"):
     conn = psycopg2.connect(dbname=db_name, user=db_user,
                             password=db_pass, host=db_host)
-    print("Создание таблиц")
-    print(type(conn))
-    create_users_table(conn)
-    create_posts_table(conn)
-    create_rates_table(conn)
-    create_referral_table(conn)
-    create_auto_actions_table(conn)
-    create_categories_table(conn)
-    create_post_prepare_table(conn)
-    conn.commit()
-    conn.close()
-    print("Успешно")
+    need = input("Do you need tables? [y/n]")
+    if need.lower() == "y" or need.lower() == "yes":
+        print("Creating...")
+
+        create_users_table(conn)
+        create_posts_table(conn)
+        create_rates_table(conn)
+        create_referral_table(conn)
+        create_auto_actions_table(conn)
+        create_categories_table(conn)
+        create_post_prepare_table(conn)
+        conn.commit()
+        conn.close()
+        print("Success")
+
+    need = input("Do you need categories? [y/n]")
+    if need.lower() == "y" or need.lower() == "yes":
+        try:
+            with open('categories.json') as f1:
+                d1 = json.loads(f1.read())
+            with open('categories_r.json') as f2:
+                d2 = json.loads(f2.read())
+        except (FileExistsError, FileNotFoundError):
+            print("No necessary files")
+
+        else:
+            for category in d1.items():
+                db.add_category(category[0], category[1]["name"], category[1]["hashtag"])
+
+            for category in d2.items():
+                db.set_category_parent(category[0], category[1]["parent"])
+            print("Enter this command: ALTER TABLE \"post_prepare\" "
+                  "ALTER COLUMN \"categories\" SET DEFAULT '';")
 
 
 if __name__ == "__main__":

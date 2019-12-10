@@ -13,13 +13,6 @@ PAYMENT_PROVIDER = '410694247:TEST:1496cc79-d856-44c4-9aa0-0271d717ca9f'
 
 # Files' path
 P_ACTIONS = "./data/actions.txt"
-P_CATEGORIES = "./data/categories.json"
-P_CATEGORIES_R = "./data/categories_r.json"  # relationships
-P_D_POSTS = "./data/dposts.json"
-P_POSTS = "./data/posts.json"
-P_ORDERS = "./data/orders.json"
-P_OWNERSHIPS = "./data/ownerships.json"
-P_USERS = "./data/users.json"
 
 # Letters limits
 FREELANCE_TITLE_LETTERS_LIMIT = 50
@@ -35,10 +28,10 @@ VERIFICATION_LINKS_LETTERS_LIMIT = 500
 
 
 # db info
-DB_NAME = 'tg_bot_fr'
-DB_USER = 'tg_freelance_bot'
-DB_HOST = '82.118.21.77'
-DB_PASS = '12345'
+DB_NAME = 'test_db'
+DB_USER = 'testrole'
+DB_HOST = '127.0.0.1'
+DB_PASS = '123456'
 
 # text
 T_COMPLETE_EDITING = "Закончите редактирование"
