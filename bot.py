@@ -53,9 +53,7 @@ def start_menu(message: telebot.types.Message):
     #     return
 
     if len(user_step) == 0:
-        # TODO поставить пользователю уникальный код
-        #  полуить код пользователя
-        db.add_user(user_id, int(time.time()))
+        
         user_step = 0
     else:
         user_step = user_step[0]
@@ -78,7 +76,7 @@ def help_and_tips(message: telebot.types.Message):
     user_step = db.get_user_steps_if_exists(user_id)
 
     if len(user_step) == 0:
-        db.add_user(user_id, int(time.time()))
+        addong_new_user(user_id)
         user_step = 0
     else:
         user_step = user_step[0]
@@ -101,7 +99,7 @@ def help_and_tips(message: telebot.types.Message):
     user_step = db.get_user_steps_if_exists(user_id)
 
     if len(user_step) == 0:
-        db.add_user(user_id, int(time.time()))
+        addong_new_user(user_id)
         user_step = 0
     else:
         user_step = user_step[0]
@@ -126,7 +124,7 @@ def query_handler(call):
     user_step = db.get_user_steps_if_exists(user_id)
 
     if len(user_step) == 0:
-        db.add_user(user_id, int(time.time()))
+        addong_new_user(user_id)
         user_step = 0
     else:
         user_step = user_step[0]
@@ -529,7 +527,7 @@ def all_left_text_messages(message: telebot.types.Message):
     message_id = message.message_id
 
     if len(user_step) == 0:
-        db.add_user(user_id, int(time.time()))
+        addong_new_user(user_id)
         user_step = 0
     else:
         user_step = user_step[0]
@@ -1748,6 +1746,11 @@ def handle_admin_command(command: str, chat_id: str or int,
 
     elif command[:12] == "/clear_cache":
         pass
+
+
+#
+def adding_new_user(user_id: str):
+    db.add_user(user_id, int(time.time()))
 
 
 #
