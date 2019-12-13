@@ -472,3 +472,7 @@ def set_notified_ban_status(user_id: str or int, notified_ban: bool):
            (str(notified_ban), str(user_id))
 
 
+@d_db_empty
+def set_referral_code_user_count(user_id: str or int, count: int or str):
+    return "UPDATE referral_codes SET count = %s WHERE author_code_id = %s", \
+           (str(count), str(user_id))

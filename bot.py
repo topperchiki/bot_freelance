@@ -34,7 +34,7 @@ def start_menu(message: telebot.types.Message):
     #  set_manual_ups(user_id, value)
     #  get_manual_ups(user_id, value)
     #  set_notified_ban_status(user_id, value)
-    #
+    #  set_referral_code_user_count(user_id, count)
     #
     # if len(message.text) > 7 :
     #     ref_code = message.text[8:]
