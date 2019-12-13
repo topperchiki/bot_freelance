@@ -461,9 +461,9 @@ def set_manual_ups(user_id: str or int, manual_ups: str or int):
 
 
 @d_db_one
-def get_manual_ups(user_id: str or int, manual_ups: str or int):
+def get_manual_ups(user_id: str or int):
     return "SELECT manual_ups FROM users WHERE user_id = %s", \
-           (str(manual_ups), str(user_id))
+           (str(user_id))
 
 
 @d_db_empty
