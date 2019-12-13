@@ -237,7 +237,6 @@ def generate_referral(chat_id, user_id):
     tb.send_message(chat_id=chat_id, text = sms)
 
 
-
 def paid_service_menu_nm(chat_id: int or str, user_id: int or str):
     db.set_user_step(user_id, 1)
 
@@ -544,7 +543,6 @@ def set_range_price_2_customer_nm(chat_id: str or int, user_id: str or int):
 
     text = "Введите максимум, $"
     tb.send_message(text=text, chat_id=chat_id)
-
 
 
 

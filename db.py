@@ -138,8 +138,8 @@ def clear_cache():
 
 @d_db_empty
 def set_referral_code(referral_code: str, user_id: str or int):
-    return "UPDATE referral_codes SET ref_code_text = %s WHERE user_id = %s", \
-           (referral_code, str(user_id))
+    return "UPDATE referral_codes SET ref_code_text = %s " \
+           "WHERE author_code_id = %s", (referral_code, str(user_id))
 
 
 @d_db_empty
@@ -428,3 +428,47 @@ def get_prepare_user_price(user_id):
 def is_category_exist(category_id: str or int):
     return 'SELECT category_id FROM categories WHERE category_id = %s', \
            (str(category_id),)
+
+
+@d_db_one
+def get_user_code(user_id: str or int):
+    return "SELECT ref_code_text FROM referral_codes WHERE " \
+           "author_code_id = %s", (str(user_id), )
+
+
+@d_db_one
+def get_referral_code_info(code: str):
+    return "SELECT author_code_id, count FROM referral_codes " \
+           "WHERE ref_code_text = %s", (code, )
+
+
+@d_db_empty
+def set_ban_status(user_id: str or int, value: bool):
+    return "UPDATE users SET banned = %s WHERE user_id = %s", \
+           (str(user_id), str(value))
+
+
+@d_db_one
+def get_ban_info(user_id: str or int):
+    return "SELECT banned, notified_ban FROM users WHERE user_id = %s", \
+           (str(user_id),)
+
+
+@d_db_empty
+def set_manual_ups(user_id: str or int, manual_ups: str or int):
+    return "UPDATE users SET manual_ups = %s WHERE user_id = %s", \
+           (str(manual_ups), str(user_id))
+
+
+@d_db_one
+def get_manual_ups(user_id: str or int, manual_ups: str or int):
+    return "SELECT manual_ups FROM users WHERE user_id = %s", \
+           (str(manual_ups), str(user_id))
+
+
+@d_db_empty
+def set_notified_ban_status(user_id: str or int, notified_ban: bool):
+    return "UPDATE users SET notified_ban = %s WHERE user_id = %s", \
+           (str(notified_ban), str(user_id))
+
+

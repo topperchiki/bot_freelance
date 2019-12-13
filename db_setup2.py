@@ -49,7 +49,7 @@ def create_categories_table(connection: psycopg2.extensions.connection):
 def create_referral_table(connection: psycopg2.extensions.connection):
     cursor = connection.cursor()
     cursor.execute('''CREATE TABLE referral_codes(
-                                ref_code_id INT UNIQUE NOT NULL,
+                                author_code_id INT UNIQUE NOT NULL,
                                 ref_code_text VARCHAR(30) UNIQUE,
                                 count INT DEFAULT 0
                                 )''')

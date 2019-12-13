@@ -27,7 +27,13 @@ def start_menu(message: telebot.types.Message):
     user_step = db.get_user_steps_if_exists(user_id)
 
     #  set_user_referral_code(user_id, author_user_id) - Поставить для пользователя user_id реферальный код пользователя author_user_id
-    #
+    #  text = get_user_code(user_id) - return string
+    #  a, b = get_referral_code_info(code) - return author_id, used_count (a and b are int)
+    #  set_ban_status(user_id, value) - Value is boolean
+    #  a, b = get_ban_info(user_id) - a and b are boolean
+    #  set_manual_ups(user_id, value)
+    #  get_manual_ups(user_id, value)
+    #  set_notified_ban_status(user_id, value)
     #
     #
     # if len(message.text) > 7 :
@@ -47,6 +53,8 @@ def start_menu(message: telebot.types.Message):
     #     return
 
     if len(user_step) == 0:
+        # TODO поставить пользователю уникальный код
+        #  полуить код пользователя
         db.add_user(user_id, int(time.time()))
         user_step = 0
     else:
