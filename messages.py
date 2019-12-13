@@ -16,7 +16,7 @@ def main_menu_building(user_id: str or int):
     mark_up.add(types.InlineKeyboardButton('Мои объявления: ' + str(count), callback_data='postpage:1'),
                 types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
     mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"),
-                types.InlineKeyboardButton('Пригласить друга', callback_data="referal"))
+                types.InlineKeyboardButton('Пригласить друга', callback_data="referral"))
 
     return text, mark_up
 
@@ -230,9 +230,12 @@ def help_nm(chat_id: int or str):
 
 
 def generate_referral(chat_id, user_id):
-    code = 'https://t.me/Mytoserbot?start='.join([hex(ord(c)).replace('0x','') for c in os.urandom(8)])
-    sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! ' + code
-    tb.send_message(chat_id, 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! ')
+    print('dd')
+    code = '666'
+    sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! '+ 'https://t.me/Mytoserbot?start=' + code
+
+    tb.send_message(chat_id=chat_id, text = sms)
+
 
 
 def paid_service_menu_nm(chat_id: int or str, user_id: int or str):
