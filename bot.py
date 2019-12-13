@@ -27,34 +27,23 @@ def start_menu(message: telebot.types.Message):
     user_step = db.get_user_steps_if_exists(user_id)
 
     #  set_user_referral_code(user_id, author_user_id) - Поставить для пользователя user_id реферальный код пользователя author_user_id
-    #  text = get_user_code(user_id) - return string
-    #  a, b = get_referral_code_info(code) - return author_id, used_count (a and b are int)
-    #  set_ban_status(user_id, value) - Value is boolean
-    #  a, b = get_ban_info(user_id) - a and b are boolean
-    #  set_manual_ups(user_id, value)
-    #  get_manual_ups(user_id, value)
-    #  set_notified_ban_status(user_id, value)
-    #  set_referral_code_user_count(user_id, count)
-    #
-    # if len(message.text) > 7 :
-    #     ref_code = message.text[8:]
-    #     db.add_point_to_ref(user_id)#TODO +1 человек к приглашенным
-    #     if db.poin_to_ref(user_id):
-    #         #даём один ручной ап
-    #         pass
-    #
-    #  a = get_info_about_user_ban(user_id) - возвращает список
-    #  a[0] - забанен ли True False
-    #  a[1] - Был ли предупрежден о блокировке True False
-    #  Если был предпрежден, то ничего не отправляй. Если не предупрежден, то предупреди и поставь флаг set_user_notified_ban(user_id, True)
-    #
-    # if db.user_id['ban'] == 'banned': #TODO запрос к бд по бану
-    #     mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
-    #     return
-
+    ban,status = db.get_info_about_user_ban(user_id)
+    if ban== True:
+        if status == False:
+            mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
     if len(user_step) == 0:
-        
+        if len(message.text) > 7:
+            ref_code = message.text[8:]
+            print('here')
+            try:
+                u_id, count = db.get_referral_code_info(ref_code)
+                if count % 5 == 0 and count != 0:
+                    count = db.get_manual_ups(u_id) + 1
+                    db.set_manual_ups(u_id, count)
+            except Exception:
+                tb.send_message(chat_id,'Неверный код')
         user_step = 0
+
     else:
         user_step = user_step[0]
 
@@ -527,7 +516,7 @@ def all_left_text_messages(message: telebot.types.Message):
     message_id = message.message_id
 
     if len(user_step) == 0:
-        addong_new_user(user_id)
+        adding_new_user(user_id)
         user_step = 0
     else:
         user_step = user_step[0]

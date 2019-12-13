@@ -230,7 +230,6 @@ def help_nm(chat_id: int or str):
 
 
 def generate_referral(chat_id, user_id):
-    print('dd')
     code = '666'
     sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! '+ 'https://t.me/Mytoserbot?start=' + code
 
