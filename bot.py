@@ -25,9 +25,14 @@ def start_menu(message: telebot.types.Message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
-
+    adm = tb.get_chat_administrators(-243828263)
+    admins = []
+    admin = True
+    for i in range(len(adm)):
+        admins.append(adm[i].user.id)
     #  set_user_referral_code(user_id, author_user_id) - Поставить для пользователя user_id реферальный код пользователя author_user_id
-
+    if user_id in admins:
+        admin = True
     if len(user_step) == 0:
         if len(message.text) > 7:
             ref_code = message.text[8:]
@@ -57,7 +62,7 @@ def start_menu(message: telebot.types.Message):
         if user_step == 29:
             mes.text_message(message, T_COMPLETE_EDITING)
             return
-        mes.main_menu_nm(message.chat.id, user_id)
+        mes.main_menu_nm(message.chat.id, user_id,admin)
         return
 
 
