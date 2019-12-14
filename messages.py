@@ -547,4 +547,3 @@ def set_range_price_2_customer_nm(chat_id: str or int, user_id: str or int):
     tb.send_message(text=text, chat_id=chat_id)
 
 
-
