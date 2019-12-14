@@ -25,19 +25,16 @@ def start_menu(message: telebot.types.Message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
-
+    tb.get_chat_administrators(-243828263)
     #  set_user_referral_code(user_id, author_user_id) - Поставить для пользователя user_id реферальный код пользователя author_user_id
-    ban,status = db.get_info_about_user_ban(user_id)
-    if ban== True:
-        if status == False:
-            mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
+
     if len(user_step) == 0:
         if len(message.text) > 7:
             ref_code = message.text[8:]
-            print('here')
             try:
                 u_id, count = db.get_referral_code_info(ref_code)
                 if count % 5 == 0 and count != 0:
+
                     count = db.get_manual_ups(u_id) + 1
                     db.set_manual_ups(u_id, count)
             except Exception:
@@ -53,7 +50,11 @@ def start_menu(message: telebot.types.Message):
             return
         mes.main_menu_nm(message.chat.id, user_id)
         return
-
+    ban, status = db.get_info_about_user_ban(user_id)
+    if ban == True:
+        if status == False:
+            db.set_notified_ban_status(user_id, True)
+            mes.text_message(chat_id, "К сожалению вы заблокированы админиистрацией")
 
 @tb.message_handler(commands=['help'])
 def help_and_tips(message: telebot.types.Message):

@@ -108,7 +108,8 @@ def create_users_table(connection: psycopg2.extensions.connection):
                                 verified BOOLEAN NOT NULL DEFAULT FALSE,
                                 referral_id INT,
                                 referral_author INT,
-                                banned BOOLEAN NOT NULL DEFAULT FALSE
+                                banned BOOLEAN NOT NULL DEFAULT FALSE,
+                                notified_ban BOOLEAN NOT NULL DEFAULT FALSE
                                 )''')
     cursor.close()
 
