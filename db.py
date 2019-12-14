@@ -499,4 +499,4 @@ def delete_auto_action_post(post_id: str or int):
 def get_user_posts_from_to(user_id: str or int,
                            skip: str or int, count: str or int):
     return "SELECT post_id FROM posts WHERE user_id = %s LIMIT %s, %s", \
-           ((str(user_id), str(skip), str(count)))
+           (str(user_id), str(skip), str(count))
