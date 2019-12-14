@@ -38,6 +38,8 @@ def start_menu(message: telebot.types.Message):
             ref_code = message.text[8:]
             try:
                 u_id, count = db.get_referral_code_info(ref_code)
+                count += 1
+                db.set_referral_code_user_count(u_id, count)
                 if count % 5 == 0 and count != 0:
                     count = db.get_manual_ups(u_id) + 1
                     db.set_manual_ups(u_id, count)
