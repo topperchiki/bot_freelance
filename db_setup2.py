@@ -29,7 +29,12 @@ def create_post_prepare_table(connection: psycopg2.extensions.connection):
                                 contacts VARCHAR(100),
                                 categories TEXT,
                                 price TEXT,
-                                guarantee BOOLEAN
+                                pay_type INT,
+                                guarantee BOOLEAN,
+
+                                new_categories TEXT,
+                                new_prices TEXT,
+                                new_pay_type INT
                                 )''')
     cursor.close()
 
@@ -74,7 +79,7 @@ def create_posts_table(connection: psycopg2.extensions.connection):
                                owner_id INT NOT NULL,
                                creation_date INT NOT NULL,
                                type INT NOT NULL,
-                               
+
                                title VARCHAR(50),
                                description VARCHAR(50),
                                memo VARCHAR(350),
@@ -82,12 +87,13 @@ def create_posts_table(connection: psycopg2.extensions.connection):
                                contacts VARCHAR(100),
                                categories TEXT,
                                price TEXT,
+                               pay_type INT, 
                                guarantee BOOLEAN,
-                               
+
                                auto_ups INT DEFAULT 0,
                                rate_id INT DEFAULT 0,
                                last_up INT DEFAULT 0,
-                               
+
                                reported INT DEFAULT 0,
                                users_reported TEXT,
                                report_was_sent BOOLEAN DEFAULT FALSE
@@ -100,7 +106,7 @@ def create_users_table(connection: psycopg2.extensions.connection):
     cursor.execute('''CREATE TABLE users(
                                 user_id INT UNIQUE NOT NULL,
                                 date_added INT NOT NULL,
-                                
+
                                 step INT NOT NULL DEFAULT 0,
                                 user_posts_count INT NOT NULL DEFAULT 0,
                                 manual_ups INT NOT NULL DEFAULT 0,
@@ -144,14 +150,18 @@ def main_setup(db_name, db_user, db_pass, db_host="localhost"):
 
         else:
             for category in d1.items():
-                db.add_category(category[0], category[1]["name"], category[1]["hashtag"])
+                db.add_category(category[0], category[1]["name"],
+                                category[1]["hashtag"])
 
             for category in d2.items():
                 db.set_category_parent(category[0], category[1]["parent"])
             print("Enter this command: ALTER TABLE \"post_prepare\" "
                   "ALTER COLUMN \"categories\" SET DEFAULT '';")
+            print("Enter this command: ALTER TABLE \"post_prepare\" "
+                  "ALTER COLUMN \"new_categories\" SET DEFAULT '';")
 
 
 if __name__ == "__main__":
     from constants import DB_NAME, DB_HOST, DB_PASS, DB_USER
+
     main_setup(DB_NAME, DB_USER, DB_PASS, DB_HOST)
