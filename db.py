@@ -476,3 +476,27 @@ def set_notified_ban_status(user_id: str or int, notified_ban: bool):
 def set_referral_code_user_count(user_id: str or int, count: int or str):
     return "UPDATE referral_codes SET count = %s WHERE author_code_id = %s", \
            (str(count), str(user_id))
+
+
+@d_db_empty
+def set_auto_ups_count(post_id: str or int, count: str or int):
+    return "UPDATE posts SET auto_ups = %s WHERE post_id = %s", \
+           (str(count), str(post_id))
+
+
+@d_db_empty
+def delete_post(post_id: str or int):
+    return "DELETE FROM posts WHERE post_id = %s", (str(post_id), )
+
+
+@d_db_empty
+def delete_auto_action_post(post_id: str or int):
+    return "DELETE FROM posts WHERE post_id = %s and action_type = 1", \
+           (str(post_id), )
+
+
+@d_db_all_exist
+def get_user_posts_from_to(user_id: str or int,
+                           skip: str or int, count: str or int):
+    return "SELECT post_id FROM posts WHERE user_id = %s LIMIT %s, %s", \
+           ((str(user_id), str(skip), str(count)))
