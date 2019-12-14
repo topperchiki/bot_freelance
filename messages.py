@@ -17,6 +17,9 @@ def main_menu_building(user_id: str or int):
                 types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
     mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"),
                 types.InlineKeyboardButton('Пригласить друга', callback_data="referral"))
+    if user_id in tb.get_chat_administrators(-243828263):
+        print('qqq')
+        mark_up.add(types.InlineKeyboardButton('Администрация', callback_data="admin_panel"))
 
     return text, mark_up
 
