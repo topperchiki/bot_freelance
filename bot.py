@@ -1861,7 +1861,7 @@ def all_left_text_messages(message: telebot.types.Message):
 
     elif message.chat.type == "public":
 
-        if chat_id in ALLOWED_GROUP_CHATS:
+        if chat_id in ADMIN_IDS:
             command = message.text.lower()
             handle_admin_command(command, chat_id, message_id, user_id)
 
@@ -1869,12 +1869,12 @@ def all_left_text_messages(message: telebot.types.Message):
 #
 def handle_admin_command(command: str, chat_id: str or int,
                          message_id: str or int, user_id: str or int):
-    if command[:9] == "/unverify":
-        user_id_to_unverify = command[10:]
-        if user_id_to_unverify[-1] == "]":
-            user_id_to_unverify = user_id_to_unverify[:-1]
-
+    if str(command[:9]) == '/unverify':
         try:
+            user_id_to_unverify = command[10:]
+            if user_id_to_unverify[-1] == "]":
+                user_id_to_unverify = user_id_to_unverify[:-1]
+
             user_id_to_unverify = int(user_id_to_unverify)
 
         except ValueError:
@@ -1882,17 +1882,15 @@ def handle_admin_command(command: str, chat_id: str or int,
             return
 
         db.set_user_verification_status(user_id_to_unverify, False)
-
         mes.text_message(chat_id,
                          "Если пользователь с таким ID существует, то его данные обновлены")
         return
 
     elif command[:7] == "/verify":
-        user_id_to_verify = command[8:]
-        if user_id_to_verify[-1] == "]":
-            user_id_to_verify = user_id_to_verify[:-1]
-
         try:
+            user_id_to_verify = command[8:]
+            if user_id_to_verify[-1] == "]":
+                user_id_to_verify = user_id_to_verify[:-1]
             user_id_to_verify = int(user_id_to_verify)
         except ValueError:
             mes.text_message(chat_id, "Неверный формат id")
@@ -1906,11 +1904,13 @@ def handle_admin_command(command: str, chat_id: str or int,
     elif command[:10] == "/user_info":
         pass
 
+
     elif command[:9] == "/ban_user":
-        user_id_to_ban = command[10:]
-        if user_id_to_ban[-1] == "]":
-            user_id_to_ban = user_id_to_ban[:-1]
         try:
+            user_id_to_ban = command[10:]
+            if user_id_to_ban[-1] == "]":
+                user_id_to_ban = user_id_to_ban[:-1]
+
             user_id_to_ban = int(user_id_to_ban)
         except ValueError:
             mes.text_message(chat_id, "Неверный формат id")
