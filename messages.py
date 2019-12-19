@@ -7,7 +7,7 @@ import time
 
 
 # Building
-def main_menu_building(user_id: str or int,value):
+def main_menu_building(user_id: str or int):
     count = len(db.get_count_user_posts(user_id))
 
     text = "Главное меню"
@@ -17,8 +17,6 @@ def main_menu_building(user_id: str or int,value):
                 types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
     mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"),
                 types.InlineKeyboardButton('Пригласить друга', callback_data="referral"))
-    if value == True:
-        mark_up.add(types.InlineKeyboardButton('Администрация', callback_data="admin_panel"))
 
     return text, mark_up
 
@@ -171,10 +169,10 @@ def generate_help():
 
 
 #
-def main_menu_nm(chat_id: str or int, user_id: str or int, value: bool):
+def main_menu_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 1)
 
-    text, mark_up = main_menu_building(user_id, value)
+    text, mark_up = main_menu_building(user_id)
 
     tb.send_message(chat_id=chat_id, text=text, reply_markup=mark_up)
 
