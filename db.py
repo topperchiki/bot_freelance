@@ -256,7 +256,7 @@ def get_category_hashtag(category_id: str or int):
 
 @d_db_one
 def get_rate_time(rate_id: str or int):
-    return 0
+    return "SELECT update_time FROM rates WHERE rate_id = %s", (str(rate_id), )
 
 
 @d_db_one
@@ -567,3 +567,28 @@ def get_user_info(user_id: str or int):
     return "SELECT user_id, user_posts_count, manual_ups, spent_money, " \
            "verified, referral_id, referral_author, banned, " \
            "notified_ban WHERE user_id = %s", (str(user_id), )
+
+
+@d_db_one
+def get_post_info(post_id: str or int):
+    return "SELECT owner_id, title, description, last_up FROM posts " \
+           "WHERE post_id = %s", (str(post_id),)
+
+
+@d_db_one
+def get_rate_info(rate_id: str or int):
+    return "SELECT update_time, price, showed FROM rates " \
+           "WHERE rate_id = %s", (str(rate_id), )
+
+
+@d_db_empty
+def add_rate(rate_id: str or int, update_time: str or int, price: str or int, showed: bool=False):
+    return "INSERT INTO rates (rate_id, update_time, price, showed) " \
+           "VALUES (%s, %s, %s, %s)", \
+           (str(rate_id), str(update_time), str(price), str(showed))
+
+
+@d_db_empty
+def set_rate_showed_status(rate_id: str or int, value: bool):
+    return "UPDATE rates SET showed = %s WHERE rate_id = %s", \
+           (str(rate_id), str(value))
