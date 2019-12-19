@@ -1039,7 +1039,6 @@ def edit_pbp_payment_type(chat_id: str or int, message_id: str or int,
 
 
 def edit_pbp_payment_type_nm(chat_id: str or int, user_id: str or int, post_type=1):
-
     text, keyboard = edit_pbp_payment_type_building(post_type)
 
     if post_type == 1:
@@ -1049,3 +1048,4 @@ def edit_pbp_payment_type_nm(chat_id: str or int, user_id: str or int, post_type
         db.set_user_step(user_id, 116)
 
     tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
+
