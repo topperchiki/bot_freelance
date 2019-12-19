@@ -7,7 +7,7 @@ import time
 
 
 # Building
-def main_menu_building(user_id: str or int, value):
+def main_menu_building(user_id: str or int):
     count = len(db.get_count_user_posts(user_id))
 
     text = "Главное меню"
@@ -21,21 +21,20 @@ def main_menu_building(user_id: str or int, value):
                                            callback_data="paidServices"),
                 types.InlineKeyboardButton('Пригласить друга',
                                            callback_data="referral"))
-    if value == True:
-        mark_up.add(types.InlineKeyboardButton('Администрация',
-                                               callback_data="admin_panel"))
+
+    mark_up.add(types.InlineKeyboardButton('Мои объявления: ' + str(count), callback_data='postpage:1'),
+                types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
+    mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"),
+                types.InlineKeyboardButton('Пригласить друга', callback_data="referral"))
 
     return text, mark_up
 
 
 def side_menu_building():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
-    a = types.InlineKeyboardButton(text="Исполнитель",
-                                   callback_data="createPost:fr")
-    b = types.InlineKeyboardButton(text="Заказчик",
-                                   callback_data="createPost:cu")
-    c = types.InlineKeyboardButton(text="В главное меню",
-                                   callback_data="mainMenu")
+    a = types.InlineKeyboardButton(text="Исполнитель", callback_data="createPost:fr")
+    b = types.InlineKeyboardButton(text="Заказчик", callback_data="createPost:cu")
+    c = types.InlineKeyboardButton(text="В главное меню", callback_data="mainMenu")
     keyboard.add(a, b, c)
     text = "Выберите тип"
     return text, keyboard
@@ -45,15 +44,12 @@ def paid_service_menu_building(user_id: str or int):
     text = 'Платные услуги'
 
     keyboard = types.InlineKeyboardMarkup(row_width=1)
-    a = types.InlineKeyboardButton(text="Реклама на канале",
-                                   url=URL_CONTACT_ACC)
+    a = types.InlineKeyboardButton(text="Реклама на канале", url=URL_CONTACT_ACC)
     b = None
     if db.get_user_verification_status(user_id):
-        b = types.InlineKeyboardButton(text="Верифицирован ✅",
-                                       callback_data="noanswer")
+        b = types.InlineKeyboardButton(text="Верифицирован ✅", callback_data="noanswer")
     else:
-        b = types.InlineKeyboardButton(text="Верификация аккаунта",
-                                       callback_data="verification")
+        b = types.InlineKeyboardButton(text="Верификация аккаунта", callback_data="verification")
     c = types.InlineKeyboardButton(text="Назад", callback_data="mainMenu")
 
     keyboard.add(a, b, c)
@@ -129,8 +125,7 @@ def get_posts_on_page(chat_id: str or int, user_id: str or int, page: int):
     if len(posts[0]) == 0:
         text = "Нет опубликованных объявлений"
         keyboard = types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(types.InlineKeyboardButton(text="В главное меню",
-                                                callback_data="mainmenu"))
+        keyboard.add(types.InlineKeyboardButton(text="В главное меню", callback_data="mainmenu"))
         return text, keyboard
 
     # Кол-во возможных страниц
@@ -155,33 +150,26 @@ def get_posts_on_page(chat_id: str or int, user_id: str or int, page: int):
         if len(ti) > 30:
             ti = ti[:27] + "..."
         text += "Наименование" + ti + "\n"
-        text += "Категория: " + db.get_category_hashtag(
-            [post[2].split(";")[-1]]) + "\n"
-        text += time.strftime("Поднято: %H:%M:%S %d.%m.%Y",
-                              time.gmtime(post[3])) + "\n"
+        text += "Категория: " + db.get_category_hashtag([post[2].split(";")[-1]]) + "\n"
+        text += time.strftime("Поднято: %H:%M:%S %d.%m.%Y", time.gmtime(post[3])) + "\n"
         has_up = False
         if post[4]:
-            text += "АвтоПодъемы (кол-во/ поднятие раз в): " + str(
-                post[5]) + "/" + nice_time(db.get_rate_time(post[4]))
+            text += "АвтоПодъемы (кол-во/ поднятие раз в): " + str(post[5]) + "/" + nice_time(db.get_rate_time(post[4]))
             has_ups = True
         if has_ups:
             text += "\n\n"
         else:
             text += "АвтоПодъемы: ❌\n\n"
 
-    text += "----------\nОсталось ручных апов ☆ - " + str(
-        db.get_user_manual_ups(user_id))
+    text += "----------\nОсталось ручных апов ☆ - " + str(db.get_user_manual_ups(user_id))
 
     data = gen_keyboard_listing(page, all_pages)
     keyboard = types.InlineKeyboardMarkup(row_width=len(data) + 1)
     buttons = []
     for i in data:
-        buttons.append(types.InlineKeyboardButton(text=i[1],
-                                                  callback_data="postpage:" + str(
-                                                      i[0])))
+        buttons.append(types.InlineKeyboardButton(text=i[1], callback_data="postpage:" + str(i[0])))
     keyboard.add(*buttons)
-    keyboard.add(types.InlineKeyboardButton(text="В главное меню",
-                                            callback_data="mainmenu"))
+    keyboard.add(types.InlineKeyboardButton(text="В главное меню", callback_data="mainmenu"))
     return text, keyboard
 
 
@@ -232,11 +220,88 @@ def edit_pbp_menu_building(post_type: int):
     return text, keyboard
 
 
+def edit_pbp_payment_menu_building(user_id: str or int, post_type=1):
+
+    text = "Выберите пункт"
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+
+    if post_type == 1:
+
+        keyboard.add(types.InlineKeyboardButton(text="Изменить тип цены",
+                                                callback_data="edit_pbp_payment"
+                                                              "_type_fr_m"))
+        pay_info = db.get_prepare_payment_info(user_id)  # type, price
+        price = pay_info[1]
+
+        if pay_info[0] == 2:
+            keyboard.add(
+                types.InlineKeyboardButton(text="Изменить: " + str(price),
+                                           callback_data="edit_pbp_price_fr"))
+        elif pay_info[0] == 3:
+            keyboard.add(types.InlineKeyboardButton(text="Изменить диапозон",
+                                                    callback_data="edit_pbp_"
+                                                                  "price_2_fr"))
+
+        keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                                callback_data="edit_pbp_"
+                                                              "menu_fr"))
+
+    else:
+
+        keyboard.add(types.InlineKeyboardButton(text="Изменить тип цены",
+                                                callback_data="edit_pbp_payment"
+                                                              "_type_cu_m"))
+
+        pay_info = db.get_prepare_payment_info(user_id)  # type, price
+        price = pay_info[1]
+
+        if pay_info[0] == 2:
+            keyboard.add(
+                types.InlineKeyboardButton(text="Изменить: " + str(price),
+                                           callback_data="edit_pbp_price_cu"))
+        elif pay_info[0] == 3:
+            keyboard.add(types.InlineKeyboardButton(text="Изменить диапозон",
+                                                    callback_data="edit_pbp_"
+                                                                  "price_2_cu"))
+
+        keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                                callback_data="edit_pbp_"
+                                                              "menu_cu"))
+    return text, keyboard
+
+
+def edit_pbp_payment_type_building(post_type=1):
+    text = "Выберите тип цены"
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+
+    if post_type == 1:
+        keyboard.add(types.InlineKeyboardButton(text="Договорная",
+                                                callback_data="edit_pbp_payment_type_fr:1"))
+        keyboard.add(types.InlineKeyboardButton(text="Фиксированная",
+                                                callback_data="edit_pbp_payment_type_fr:2"))
+        keyboard.add(types.InlineKeyboardButton(text="Диапозон цен",
+                                                callback_data="edit_pbp_payment_type_fr:3"))
+        keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                                callback_data="edit_pbp_menu_fr"))
+
+    else:
+        keyboard.add(types.InlineKeyboardButton(text="Договорная",
+                                                callback_data="edit_pbp_payment_type_cu:1"))
+        keyboard.add(types.InlineKeyboardButton(text="Фиксированная",
+                                                callback_data="edit_pbp_payment_type_cu:2"))
+        keyboard.add(types.InlineKeyboardButton(text="Диапозон цен",
+                                                callback_data="edit_pbp_payment_type_cu:3"))
+        keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                                callback_data="edit_pbp_menu_cu"))
+
+    return text, keyboard
+
+
 #
-def main_menu_nm(chat_id: str or int, user_id: str or int, value: bool):
+def main_menu_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 1)
 
-    text, mark_up = main_menu_building(user_id, value)
+    text, mark_up = main_menu_building(user_id)
 
     tb.send_message(chat_id=chat_id, text=text, reply_markup=mark_up)
 
@@ -266,13 +331,11 @@ def text_message(chat_id: str or int, text: str):
     tb.send_message(text=text, chat_id=chat_id)
 
 
-def send_posts_page(chat_id: str or int, message_id: str or int,
-                    user_id: str or int, page: int):
+def send_posts_page(chat_id: str or int, message_id: str or int, user_id: str or int, page: int):
     text, keyboard = get_posts_on_page(chat_id, user_id, page)
     if text is None:
         return
-    tb.edit_message_text(text=text, message_id=message_id, chat_id=chat_id,
-                         reply_markup=keyboard)
+    tb.edit_message_text(text=text, message_id=message_id, chat_id=chat_id, reply_markup=keyboard)
 
 
 def send_posts_page_nm(chat_id: str or int, user_id: str or int, page: int):
@@ -283,9 +346,7 @@ def send_posts_page_nm(chat_id: str or int, user_id: str or int, page: int):
 
 
 def post_doesnt_exist_message(chat_id: str or int):
-    tb.send_message(
-        text="Объявления с таким id не существует\nФормат запроса /id_postЧисло",
-        chat_id=chat_id)
+    tb.send_message(text="Объявления с таким id не существует\nФормат запроса /id_postЧисло", chat_id=chat_id)
 
 
 def failed_showing_post(chat_id: str or int):
@@ -299,9 +360,9 @@ def help_nm(chat_id: int or str):
 
 def generate_referral(chat_id, user_id):
     code = '666'
-    sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! ' + 'https://t.me/Mytoserbot?start=' + code
+    sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! '+ 'https://t.me/Mytoserbot?start=' + code
 
-    tb.send_message(chat_id=chat_id, text=sms)
+    tb.send_message(chat_id=chat_id, text = sms)
 
 
 def paid_service_menu_nm(chat_id: int or str, user_id: int or str):
@@ -312,18 +373,15 @@ def paid_service_menu_nm(chat_id: int or str, user_id: int or str):
     tb.send_message(chat_id=chat_id, text=text, reply_markup=mark_up)
 
 
-def paid_service_menu(chat_id: int or str, message_id: str or int,
-                      user_id: int or str):
+def paid_service_menu(chat_id: int or str, message_id: str or int, user_id: int or str):
     db.set_user_step(user_id, 1)
 
     text, mark_up = paid_service_menu_building(user_id)
 
-    tb.send_message(chat_id=chat_id, message_id=message_id, text=text,
-                    reply_markup=mark_up)
+    tb.send_message(chat_id=chat_id, message_id=message_id, text=text, reply_markup=mark_up)
 
 
-def categories_post(chat_id: str or int, message_id: str or int,
-                    user_id: str or int, post_type=1):
+def categories_post(chat_id: str or int, message_id: str or int, user_id: str or int, post_type=1):
     customer = False
     if post_type == 2:
         customer = True
@@ -338,13 +396,11 @@ def categories_post(chat_id: str or int, message_id: str or int,
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     for category in categories:
         keyboard.add(types.InlineKeyboardButton(text=category[1],
-                                                callback_data=text_pattern + str(
-                                                    category[0])))
+                                                callback_data=text_pattern + str(category[0])))
 
     keyboard.add(types.InlineKeyboardButton("Назад", callback_data="sideMenu"))
     text = "Выберите категорию"
-    tb.edit_message_text(text=text, chat_id=chat_id, message_id=message_id,
-                         reply_markup=keyboard)
+    tb.edit_message_text(text=text, chat_id=chat_id, message_id=message_id, reply_markup=keyboard)
 
 
 def categories_post_nm(chat_id: str or int, user_id: str or int, post_type=1):
@@ -363,16 +419,14 @@ def categories_post_nm(chat_id: str or int, user_id: str or int, post_type=1):
     for category in categories:
         keyboard.add(types.InlineKeyboardButton(text=category[1],
                                                 callback_data=text_pattern +
-                                                              category[0]))
+                                                              str(category[0])))
 
     keyboard.add(types.InlineKeyboardButton("Назад", callback_data="sideMenu"))
     text = "Выберите категорию"
     tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
 
 
-def subcategories_post(chat_id: str or int, message_id: str or int,
-                       category_to_show: str or int, user_id: str or int,
-                       post_type=1):
+def subcategories_post(chat_id: str or int, message_id: str or int, category_to_show: str or int, user_id: str or int, post_type=1):
     customer = False
     if post_type == 2:
         customer = True
@@ -389,21 +443,14 @@ def subcategories_post(chat_id: str or int, message_id: str or int,
     text_pattern += "_n_"
 
     for category in categories:
-        keyboard.add(types.InlineKeyboardButton(text=category[1],
-                                                callback_data=text_pattern + str(
-                                                    category[0])))
+        keyboard.add(types.InlineKeyboardButton(text=category[1], callback_data=text_pattern + str(category[0])))
 
-    keyboard.add(types.InlineKeyboardButton("Назад",
-                                            callback_data=text_pattern2 + str(
-                                                db.get_category_parent(
-                                                    category_to_show)[0])))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data=text_pattern2 + str(db.get_category_parent(category_to_show)[0])))
     text = "Выберите категорию"
-    tb.edit_message_text(text=text, chat_id=chat_id, message_id=message_id,
-                         reply_markup=keyboard)
+    tb.edit_message_text(text=text, chat_id=chat_id, message_id=message_id, reply_markup=keyboard)
 
 
-def subcategories_post_nm(chat_id: str or int, category_to_show: str or int,
-                          user_id: str or int, post_type=1):
+def subcategories_post_nm(chat_id: str or int, category_to_show: str or int, user_id: str or int, post_type=1):
     customer = False
     if post_type == 2:
         customer = True
@@ -422,18 +469,18 @@ def subcategories_post_nm(chat_id: str or int, category_to_show: str or int,
     for category in categories:
         keyboard.add(types.InlineKeyboardButton(text=category[1],
                                                 callback_data=text_pattern +
-                                                              category[0]))
+                                                              str(category[0])))
 
     keyboard.add(types.InlineKeyboardButton("Назад",
-                                            callback_data=text_pattern2 + db.get_category_parent(
-                                                category_to_show)))
+                                            callback_data=text_pattern2 + str(db.get_category_parent(
+                                                category_to_show))))
     text = "Выберите категорию"
     tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
 
 
 def set_title_freelance_post_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 5)
-    text = "Название услуги (не более " + \
+    text = "Название услуги (не более " +\
            str(FREELANCE_TITLE_LETTERS_LIMIT) + " символов)"
     keyboard = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
     keyboard.add(types.KeyboardButton(text="Назад"),
@@ -445,7 +492,7 @@ def set_title_freelance_post_nm(chat_id: str or int, user_id: str or int):
 def set_description_freelance_post_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 6)
 
-    text = "Описание услуги (не более " + \
+    text = "Описание услуги (не более " +\
            str(FREELANCE_DESCRIPTION_LETTERS_LIMIT) + " символов)"
     keyboard = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
     keyboard.add(types.KeyboardButton(text="Назад"),
@@ -457,7 +504,7 @@ def set_description_freelance_post_nm(chat_id: str or int, user_id: str or int):
 def set_memo_freelance_post_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 7)
 
-    text = "Памятка заказчику (не более " + \
+    text = "Памятка заказчику (не более " +\
            str(FREELANCE_MEMO_LETTERS_LIMIT) + " символов)"
     keyboard = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
     keyboard.add(types.KeyboardButton(text="Назад"),
@@ -484,11 +531,10 @@ def set_contacts_freelance_post_nm(chat_id: str or int, user_id: str or int):
     keyboard = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
     keyboard.add(types.KeyboardButton(text="Назад"),
                  types.KeyboardButton(text="В главное меню"))
-    tb.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+    tb.send_message(chat_id= chat_id, text=text, reply_markup=keyboard)
 
 
-def set_payment_type_freelance_post_nm(chat_id: str or int,
-                                       user_id: str or int):
+def set_payment_type_freelance_post_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 10)
 
     keyboard = types.InlineKeyboardMarkup(row_width=1)
@@ -508,8 +554,7 @@ def set_fixed_price_freelance_nm(chat_id: str or int, user_id: str or int):
     tb.send_message(text="Введите цену в долларах, $", chat_id=chat_id)
 
 
-def is_guarantee_necessary_freelance_nm(chat_id: str or int,
-                                        user_id: str or int):
+def is_guarantee_necessary_freelance_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 14)
 
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -551,8 +596,7 @@ def set_title_customer_post_nm(chat_id: str or int, user_id: str or int):
 def set_description_customer_post_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 102)
 
-    text = "Описание услуги (не более " + str(
-        CUSTOMER_DESCRIPTION_LETTERS_LIMIT) + " символов)"
+    text = "Описание услуги (не более " + str(CUSTOMER_DESCRIPTION_LETTERS_LIMIT) + " символов)"
     keyboard = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
     keyboard.add(types.KeyboardButton(text="Назад"),
                  types.KeyboardButton(text="В главное меню"))
@@ -606,8 +650,7 @@ def set_fixed_price_customer_nm(chat_id: str or int, user_id: str or int):
     tb.send_message(text="Введите цену в долларах, $", chat_id=chat_id)
 
 
-def is_guarantee_necessary_customer_nm(chat_id: str or int,
-                                       user_id: str or int):
+def is_guarantee_necessary_customer_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 109)
 
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -634,7 +677,8 @@ def set_range_price_2_customer_nm(chat_id: str or int, user_id: str or int):
     tb.send_message(text=text, chat_id=chat_id)
 
 
-def send_prepared_post_nm(chat_id: str or int, user_id: str or int):
+def send_prepared_post_nm(chat_id: str or int, user_id: str or int,
+                          only_post=False):
     post_info = db.get_prepared_post(user_id)
     blocks = []
     portfolio_block = None
@@ -675,7 +719,7 @@ def send_prepared_post_nm(chat_id: str or int, user_id: str or int):
         blocks.append("Цена: " + minimum_price + " - " + maximum_price + " $")
 
     cat_block = "Категории: "
-    categories = post_info[3].split(";")
+    categories = [int(i) for i in post_info[3].split(";")]
     categories_hashtags = db.get_hashtags_categories_with_ids(categories)
     d_cat = dict()
     for cat in categories_hashtags:
@@ -702,19 +746,38 @@ def send_prepared_post_nm(chat_id: str or int, user_id: str or int):
         len_buffer += len(block)
 
     if len(blocks_buffer) > 0:
-        keyboard = types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(types.InlineKeyboardButton(text="Опубликовать",
-                                                callback_data="post"))
-        keyboard.add(types.InlineKeyboardButton(text="Редактировать",
-                                                callback_data=
-                                                "edit_pbp_menu_"
-                                                + "fr" if post_info[0] == 1
-                                                else "cu"))
+        if not only_post:
+            keyboard = types.InlineKeyboardMarkup(row_width=1)
+            keyboard.add(types.InlineKeyboardButton(text="Опубликовать",
+                                                    callback_data="post"))
+            keyboard.add(types.InlineKeyboardButton(text="Редактировать",
+                                                    callback_data=
+                                                    "edit_pbp_menu_"
+                                                    + "fr" if post_info[0] == 1
+                                                    else "cu"))
 
-        tb.send_message(text='\n'.join(blocks_buffer), chat_id=chat_id)
+            tb.send_message(text='\n'.join(blocks_buffer), chat_id=chat_id, reply_markup=keyboard)
+        else:
+            tb.send_message(text='\n'.join(blocks_buffer), chat_id=chat_id)
 
-    # if not only_post:
-    #     tb.send_message(text="Выберите действие", chat_id=message.chat.id, reply_markup=keyboard)
+
+def back_prepare_post_menu(chat_id: str or int, message_id: str or int,
+                           user_id: str or int):
+    post_type = db.get_prepare_post_type(user_id)[0]
+    if post_type == 1:
+        db.set_user_step(user_id, 15)
+    else:
+        db.set_user_step(user_id, 110)
+
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(text="Опубликовать",
+                                            callback_data="post"))
+    keyboard.add(types.InlineKeyboardButton(text="Редактировать",
+                                            callback_data=
+                                            "edit_pbp_menu_"
+                                            + "fr" if post_type == 1
+                                            else "cu"))
+    tb.edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=keyboard)
 
 
 def edit_pbp_menu(chat_id: str or int, message_id: str or int,
@@ -852,3 +915,137 @@ def edit_pbp_categories(chat_id: str or int, message_id: str or int,
     text = "Выберите категорию"
     tb.edit_message_text(text=text, chat_id=chat_id, message_id=message_id,
                          reply_markup=keyboard)
+
+
+def edit_pbp_payment_menu(chat_id: str or int, message_id: str or int,
+                          user_id: str or int, post_type=1):
+
+    if post_type == 1:
+        db.set_user_step(user_id, 22)
+    else:
+        db.set_user_step(user_id, 115)
+
+    text, keyboard = edit_pbp_payment_menu_building(user_id, post_type)
+    tb.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
+                         reply_markup=keyboard)
+
+
+def edit_pbp_payment_menu_nm(chat_id: str or int, user_id: str or int, post_type=1):
+
+    if post_type == 1:
+        db.set_user_step(user_id, 22)
+    else:
+        db.set_user_step(user_id, 115)
+
+    text, keyboard = edit_pbp_payment_menu_building(user_id, post_type)
+    tb.send_message(chat_id=chat_id, text=text,
+                         reply_markup=keyboard)
+
+
+def edit_pbp_fixed_price_nm(chat_id: str or int, user_id: str or int,
+                            post_type=1):
+    if post_type == 1:
+        db.set_user_step(user_id, 24)
+    else:
+        db.set_user_step(user_id, 117)
+
+    text = "Введите цену, $"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def edit_pbp_price_nm(chat_id: str or int, user_id: str or int, post_type=1):
+    if post_type == 1:
+        db.set_user_step(user_id, 27)
+    else:
+        db.set_user_step(user_id, 120)
+
+    text = "Введите новое число, $"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+def edit_pbp_price_range_nm(chat_id: str or int, user_id: str or int,
+                            post_type=1):
+    if post_type == 1:
+        db.set_user_step(user_id, 28)
+    else:
+        db.set_user_step(user_id, 121)
+
+    text = "Введите минимум, $"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def edit_pbp_price_range_2_nm(chat_id: str or int, user_id: str or int,
+                              post_type=1):
+    if post_type == 1:
+        db.set_user_step(user_id, 29)
+    else:
+        db.set_user_step(user_id, 122)
+
+    text = "Введите максимум, $"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def edit_pbp_range_price_1_nm(chat_id: str or int, user_id: str or int,
+                              post_type=1):
+    if post_type == 1:
+        db.set_user_step(user_id, 25)
+    else:
+        db.set_user_step(user_id, 118)
+
+    text = "Введите минимуальную цену, $"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def edit_pbp_guarantee(chat_id: str or int, message_id: str or int, user_id: str or int, post_type=1):
+
+    text = "Введите минимуальную цену, $"
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+
+    if post_type == 1:
+        db.set_user_step(user_id, 25)
+
+        keyboard.add(types.InlineKeyboardButton(text="Да",
+                                                callback_data="edit_pbp_guarantee_fr_y"))
+        keyboard.add(types.InlineKeyboardButton(text="Нет",
+                                                callback_data="edit_pbp_guarantee_fr_n"))
+        keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                                callback_data="edit_pbp_menu_fr"))
+    else:
+        db.set_user_step(user_id, 118)
+
+        keyboard.add(types.InlineKeyboardButton(text="Да",
+                                                callback_data="edit_pbp_guarantee_cu_y"))
+        keyboard.add(types.InlineKeyboardButton(text="Нет",
+                                                callback_data="edit_pbp_guarantee_cu_n"))
+        keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                                callback_data="edit_pbp_menu_cu"))
+
+    tb.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, reply_markup=keyboard)
+
+
+def edit_pbp_payment_type(chat_id: str or int, message_id: str or int,
+                          user_id: str or int, post_type=1):
+
+    text, keyboard = edit_pbp_payment_type_building(post_type)
+
+    if post_type == 1:
+        db.set_user_step(user_id, 23)
+
+    else:
+        db.set_user_step(user_id, 116)
+
+    tb.edit_message_text(text=text, message_id=message_id, chat_id=chat_id,
+                         reply_markup=keyboard)
+
+
+def edit_pbp_payment_type_nm(chat_id: str or int, user_id: str or int, post_type=1):
+
+    text, keyboard = edit_pbp_payment_type_building(post_type)
+
+    if post_type == 1:
+        db.set_user_step(user_id, 23)
+
+    else:
+        db.set_user_step(user_id, 116)
+
+    tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)

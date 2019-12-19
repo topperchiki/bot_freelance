@@ -33,8 +33,7 @@ def create_post_prepare_table(connection: psycopg2.extensions.connection):
                                 guarantee BOOLEAN,
 
                                 new_categories TEXT,
-                                new_prices TEXT,
-                                new_pay_type INT
+                                new_prices TEXT
                                 )''')
     cursor.close()
 

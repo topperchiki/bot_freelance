@@ -25,19 +25,16 @@ def start_menu(message: telebot.types.Message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     user_step = db.get_user_steps_if_exists(user_id)
-    adm = tb.get_chat_administrators(-243828263)
-    admins = []
-    admin = True
-    for i in range(len(adm)):
-        admins.append(adm[i].user.id)
+
     #  set_user_referral_code(user_id, author_user_id) - Поставить для пользователя user_id реферальный код пользователя author_user_id
-    if user_id in admins:
-        admin = True
+
     if len(user_step) == 0:
         if len(message.text) > 7:
             ref_code = message.text[8:]
             try:
                 u_id, count = db.get_referral_code_info(ref_code)
+                count += 1
+                db.set_referral_code_user_count(u_id, count)
                 if count % 5 == 0 and count != 0:
                     count = db.get_manual_ups(u_id) + 1
                     db.set_manual_ups(u_id, count)
@@ -285,7 +282,7 @@ def query_handler(call):
                 if user_step not in POSSIBLE_COME_TO_PAYMENTTYPE_CU:
                     return
 
-            pay_type = call.data[15:]
+            pay_type = call.data[16:]
 
             # Проверка на актуальность
             try:
@@ -360,15 +357,15 @@ def query_handler(call):
                 if user_step not in POSSIBLE_COME_TO_GUARANTEE_CU:
                     return
 
-            ans = call.data[13]
             try:
+                ans = call.data[13:]
                 ans = bool(ans)
-            except ValueError:
+            except ValueError or KeyError:
                 mes.text_message(chat_id, "Неверный вариант")
                 return
 
             db.set_prepare_user_guarantee(user_id, ans)
-            mes.preview_post_nm(chat_id, user_id)
+            mes.send_prepared_post_nm(chat_id, user_id)
             return
 
         elif call_data_lowered[:9] == "portfolio":
@@ -424,7 +421,7 @@ def query_handler(call):
                 if user_step not in POSSIBLE_COME_TO_PREVIEW_POST_CU:
                     return
 
-            mes.send_prepared_post_nm(chat_id, user_id, post_type)
+            mes.send_prepared_post_nm(chat_id, user_id)
             return
 
         elif call_data_lowered == "post":
@@ -435,7 +432,7 @@ def query_handler(call):
             elif post_type == 2:
                 if user_step not in POSSIBLE_COME_TO_POST_CU:
                     return
-
+            return
             new_id = random.randint(100000, 999999)
             while db.is_post_id_used(new_id):
                 new_id = random.randint(100000, 999999)
@@ -481,7 +478,7 @@ def query_handler(call):
         elif call_data_lowered[:8] == "edit_pbp":
             left_part = call_data_lowered[9:]
 
-            if left_part == "menu":
+            if left_part[:4] == "menu":
                 post_type = (1 if left_part[5:7] == "fr" else 2)
                 if post_type == 1:
                     if user_step not in POSSIBLE_COME_TO_EDIT_PBP_MENU_FR:
@@ -490,6 +487,7 @@ def query_handler(call):
                     if user_step not in POSSIBLE_COME_TO_EDIT_PBP_MENU_CU:
                         return
 
+                db.set_prepare_new_user_categories(user_id, "")
                 mes.edit_pbp_menu_nm(chat_id, user_id, post_type)
                 return
 
@@ -658,15 +656,163 @@ def query_handler(call):
                 mes.edit_pbp_contacts_nm(chat_id, user_id, post_type)
                 return
 
-            # elif left_part == "payment":
-            # elif left_part == "payment_type":
-            # elif left_part == "payment_type_2_fr:":
-            # elif left_part == "price":
-            # elif left_part == "price_2":
-            # elif left_part == "guarantee":
-            # elif left_part == "guarantee_yes":
-            # elif left_part == "guarantee_no":
-            #     pass
+            elif left_part == "payment":
+                post_type = (1 if left_part[8:10] == "fr" else 2)
+
+                if post_type == 1:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENT_FR:
+                        return
+
+                elif post_type == 2:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENT_CU:
+                        return
+
+                mes.edit_pbp_payment_menu(chat_id, message_id, user_id)
+                return
+
+            elif left_part == "payment_type":
+                post_type = (1 if left_part[13:15] == "fr" else 2)
+
+                if post_type == 1:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENTTYPE_FR:
+                        return
+
+                elif post_type == 2:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENTTYPE_CU:
+                        return
+
+                pay_data = call.data[15:]
+
+                if pay_data == "m":  # menu
+                    mes.edit_pbp_payment_type(chat_id, message_id, user_id,
+                                              post_type)
+                    return
+
+                # Проверка на актуальность
+                try:
+                    pay_type = int(pay_data)
+                except ValueError:
+                    mes.text_message(chat_id, "Неверный тип цены")
+                    return
+
+                if pay_type < 1 or pay_type > 3:
+                    mes.text_message(chat_id, "Неверный тип цены")
+                    return
+
+                if pay_type == 1:
+
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(
+                        telebot.types.InlineKeyboardButton(text="Договорная ✅",
+                                                           callback_data="noanswer"))
+
+                    # Удаляем предыдущую клавиатуру
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+
+                    mes.send_prepared_post_nm(chat_id, user_id)
+                    return
+
+                elif pay_type == 2:
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(
+                        telebot.types.InlineKeyboardButton(
+                            text="Фиксированная ✅",
+                            callback_data="noAnswer"))
+                    # Удаляем предыдущую клавиатуру
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+
+                    mes.edit_pbp_fixed_price_nm(chat_id, user_id, post_type)
+                    return
+
+                elif pay_type == 3:
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(
+                        telebot.types.InlineKeyboardButton(text="Диапозон ✅",
+                                                           callback_data="noAnswer"))
+                    # Удаляем предыдущую клавиатуру
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+
+                    mes.edit_pbp_range_price_1_nm(chat_id, user_id, post_type)
+                    return
+
+            elif left_part == "price":
+                post_type = (1 if left_part[6:8] == "fr" else 2)
+
+                if post_type == 1:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PRICE_FR:
+                        return
+
+                elif post_type == 2:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PRICE_CU:
+                        return
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(
+                    telebot.types.InlineKeyboardButton(text="Изменить цену ✅",
+                                                       callback_data=
+                                                       "noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+
+                mes.edit_pbp_price_nm(chat_id, user_id, post_type)
+                return
+
+            elif left_part == "price_2":
+                post_type = (1 if left_part[8:10] == "fr" else 2)
+
+                if post_type == 1:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PRICE_2_FR:
+                        return
+
+                elif post_type == 2:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PRICE_2_CU:
+                        return
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(
+                    telebot.types.InlineKeyboardButton(text="Изменить диапозон "
+                                                            "✅",
+                                                       callback_data=
+                                                       "noAnswer"))
+                # Удаляем предыдущую клавиатуру
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+
+                mes.edit_pbp_price_range_nm(chat_id, user_id, post_type)
+                return
+
+            elif left_part == "guarantee":
+                post_type = (1 if left_part[10:12] == "fr" else 2)
+
+                if post_type == 1:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_FR:
+                        return
+                elif post_type == 2:
+                    if user_step not in POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_CU:
+                        return
+                left_part_another = left_part[13:]
+
+                if left_part_another == "y":
+                    db.set_prepare_user_guarantee(user_id, True)
+                    mes.send_prepared_post_nm(chat_id, user_id)
+                    return
+
+                elif left_part_another == "n":
+                    db.set_prepare_user_guarantee(user_id, False)
+                    mes.send_prepared_post_nm(chat_id, user_id)
+                    return
+
+                mes.edit_pbp_guarantee(chat_id, user_id, post_type)
+                return
 
         # elif call_data_lowered == "verification":
         #
@@ -722,7 +868,6 @@ def query_handler(call):
         #
         #     elif left_part == "payment":
         #
-
 
     elif call.chat.type == "group" and chat_id in ALLOWED_GROUP_CHATS:
         pass
@@ -780,8 +925,8 @@ def all_left_text_messages(message: telebot.types.Message):
                 if len(categories) == 1:
                     mes.categories_post_nm(chat_id, user_id)
                 else:
-                    mes.subcategories_post_nm(chat_id, user_id,
-                                              categories[index])
+                    mes.subcategories_post_nm(chat_id, categories[index],
+                                              user_id)
                 return
 
             elif user_step == 6:
@@ -827,71 +972,66 @@ def all_left_text_messages(message: telebot.types.Message):
             elif user_step == 16:
                 return
 
-            # elif user_step == 17:
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 18:
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 19:
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 20:
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 21:
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 22:
-            #     mes.edit_pbp_menu_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 23:
-            #     return
-            #
-            # elif user_step == 24:
-            #     mes.edit_pbp_payment_type_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 25:
-            #     mes.edit_pbp_payment_type_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 26:
-            #     mes.edit_pbp_nt_1_price_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 27:
-            #     mes.edit_pbp_payment_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 28:
-            #     mes.edit_pbp_payment_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 29:
-            #     mes.error_message(message, "Необходимо ввести второе число")
-            #     return
-            #
-            # elif user_step == 30:
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"])
-            #     return
+            elif user_step == 17:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id)
+                return
+
+            elif user_step == 18:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id)
+                return
+
+            elif user_step == 19:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id)
+                return
+
+            elif user_step == 20:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id)
+                return
+
+            elif user_step == 21:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id)
+                return
+
+            elif user_step == 22:
+                mes.edit_pbp_menu_nm(chat_id, user_id)
+                return
+
+            elif user_step == 23:
+                return
+
+            elif user_step == 24:
+                mes.edit_pbp_payment_type_nm(chat_id, user_id)
+                return
+
+            elif user_step == 25:
+                mes.edit_pbp_payment_type_nm(chat_id, user_id)
+                return
+
+            elif user_step == 26:
+                mes.edit_pbp_fixed_price_nm(chat_id, user_id)
+                return
+
+            elif user_step == 27:
+                mes.edit_pbp_payment_menu(chat_id, message_id, user_id)
+                return
+
+            elif user_step == 28:
+                mes.edit_pbp_payment_menu(chat_id, message_id, user_id)
+                return
+
+            elif user_step == 29:
+                mes.text_message(message, "Необходимо ввести второе число")
+                return
+
+            elif user_step == 30:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id)
+                return
             #
             # elif user_step == 31:
             #     return
@@ -1001,8 +1141,8 @@ def all_left_text_messages(message: telebot.types.Message):
                 if len(categories) == 1:
                     mes.categories_post_nm(chat_id, user_id, post_type=2)
                 else:
-                    mes.subcategories_post_nm(chat_id, user_id,
-                                              categories[index], post_type=2)
+                    mes.subcategories_post_nm(chat_id, categories[index],
+                                              user_id, post_type=2)
                 return
 
             elif user_step == 102:
@@ -1040,71 +1180,64 @@ def all_left_text_messages(message: telebot.types.Message):
                 mes.is_guarantee_necessary_customer_nm(chat_id, user_id)
                 return
 
-            # elif user_step == 111:
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(message)
-            #     return
-            #
-            # elif user_step == 112:
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(message)
-            #     return
-            #
-            # elif user_step == 113:
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(message)
-            #     return
-            #
-            # elif user_step == 114:
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(message)
-            #     return
-            #
-            # elif user_step == 115:
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(message)
-            #     return
-            #
-            # elif user_step == 116:
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(message)
-            #     return
-            #
-            # elif user_step == 117:
-            #     mes.edit_pbp_payment_type_customer_nm(message)
-            #     return
-            #
-            # elif user_step == 118:
-            #     mes.edit_pbp_payment_type_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 119:
-            #     mes.edit_pbp_nt_1_price_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 120:
-            #     mes.edit_pbp_payment_type_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 121:
-            #     mes.edit_pbp_payment_type_freelance_nm(message)
-            #     return
-            #
-            # elif user_step == 122:
-            #     mes.error_message(message, "Необходимо ввести второе число")
-            #     return
-            #
-            # elif user_step == 123:
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(message)
-            #     return
+            elif user_step == 111:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 112:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 113:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 114:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 115:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 116:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 117:
+                mes.edit_pbp_payment_type_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 118:
+                mes.edit_pbp_payment_type_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 119:
+                mes.edit_pbp_range_price_1_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 120:
+                mes.edit_pbp_payment_type_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 121:
+                mes.edit_pbp_payment_type_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 122:
+                mes.text_message(message, "Необходимо ввести второе число")
+                return
+
+            elif user_step == 123:
+                mes.send_prepared_post_nm(chat_id, user_id, True)
+                mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
 
         elif lowered_message == "в главное меню" or lowered_message == \
                 "главное меню":
@@ -1219,182 +1352,191 @@ def all_left_text_messages(message: telebot.types.Message):
             elif user_step == 16:
                 return
 
-            # elif user_step == 17:
-            #     ans, error_text = is_suitable_title_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"]["title"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 18:
-            #     ans, error_text = is_suitable_description_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"][
-            #         "description"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 19:
-            #     ans, error_text = is_suitable_memo_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"]["memo"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 20:
-            #     ans, error_text = is_url(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"][
-            #         "portfolio"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 21:
-            #     ans, error_text = is_suitable_contacts_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"][
-            #         "contacts"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 22:
-            #     return
-            #
-            # elif user_step == 23:
-            #     return
-            #
-            # elif user_step == 24:
-            #     ans, error_text = is_suitable_price_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #     users_table[user_id]["freelance_post"]["payment_type"] = 2
-            #     users_table[user_id]["freelance_post"]["price"] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     users_table[user_id]["editing_freelance_post"] = {}
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 25:
-            #     ans, error_text = is_suitable_price_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["editing_freelance_post"]["price"][0] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.edit_pbp_nt_2_price_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 26:
-            #     ans, error_text = is_suitable_price_2_fl(message.text,
-            #                                              users_table[user_id][
-            #                                                  "editing_freelance_post"][
-            #                                                  "price"][0])
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #     users_table[user_id]["freelance_post"]["payment_type"] = 3
-            #     users_table[user_id]["freelance_post"]["price"] = [0, 0]
-            #     users_table[user_id]["freelance_post"]["price"][0] = \
-            #     users_table[user_id]["editing_freelance_post"]["price"][0]
-            #     users_table[user_id]["freelance_post"]["price"][1] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     users_table[user_id]["editing_freelance_post"] = {}
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 27:
-            #     ans, error_text = is_suitable_price_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"]["price"] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 28:
-            #     ans, error_text = is_suitable_price_fl(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"]["price"][0] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.edit_pbp_price_2_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 29:
-            #     ans, error_text = is_suitable_price_2_fl(message.text,
-            #                                              users_table[user_id][
-            #                                                  "freelance_post"][
-            #                                                  "price"][0])
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["freelance_post"]["price"][1] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_freelance_nm(message, users_table[user_id][
-            #         "freelance_post"], True)
-            #     mes.edit_pbp_menu_freelance_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 30:
-            #     return
-            #
-            # elif user_step == 31:
-            #     return
-            #
-            # elif user_step == 70:
-            #     return
-            #
-            # elif user_step == 71:
-            #     return
+            elif user_step in (17, 111):
+                if user_step == 17:
+                    ans, error_text = is_suitable_title_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_title_cu(message.text)
+
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_user_title(user_id, message.text)
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step in (18, 112):
+                if user_step == 18:
+                    ans, error_text = is_suitable_description_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_description_cu(message.text)
+
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_user_description(user_id, message.text)
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step == 19:
+                ans, error_text = is_suitable_memo_fl(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_user_memo(user_id, message.text)
+                mes.set_memo_freelance_post_nm(chat_id, user_id)
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step == 20:
+                ans, error_text = is_url(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_user_portfolio(user_id, message.text)
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step in (21, 114):
+                if user_step == 21:
+                    ans, error_text = is_suitable_contacts_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_contacts_cu(message.text)
+
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_user_contacts(user_id, message.text)
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step == 22:
+                return
+
+            elif user_step == 23:
+                return
+
+            elif user_step in (24, 117):
+                if user_step == 24:
+                    ans, error_text = is_suitable_price_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_price_cu(message.text)
+
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_payment_info(user_id, 2, message.text)
+
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step in (25, 118):
+                if user_step == 25:
+                    ans, error_text = is_suitable_price_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_price_cu(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_new_user_price(user_id,
+                                              int(100 * float(
+                                                  message.text)) / 100)
+                if user_step == 25:
+                    mes.edit_pbp_range_price_1_nm(chat_id, user_id, 1)
+                else:
+                    mes.edit_pbp_range_price_1_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step in (26, 119):
+
+                price1 = db.get_prepare_new_user_price(user_id)
+                if user_step == 26:
+                    ans, error_text = is_suitable_price_2_fl(message.text, float(price1))
+                else:
+                    ans, error_text = is_suitable_price_2_cu(message.text,
+                                                             float(price1))
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_payment_info(user_id, 3,
+                                            price1 + ";" + str(int(100 * float(
+                                                  message.text)) / 100))
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step in (27, 120):
+                if user_step == 27:
+                    ans, error_text = is_suitable_price_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_price_cu(message.text)
+
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_user_price(user_id, str(int(100 * float(
+                                                  message.text)) / 100))
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step in (28, 121):
+                if user_step == 28:
+                    ans, error_text = is_suitable_price_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_price_cu(message.text)
+
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                a = db.get_prepare_user_price(user_id)
+                db.set_prepare_user_price(user_id,
+                                          str(int(100 * float(
+                                              message.text)) / 100) + ";"
+                                          + a.split(";")[1])
+
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step in (29, 122):
+
+                a = db.get_prepare_user_price(user_id).split(";")
+                if user_step == 29:
+                    ans, error_text = is_suitable_price_2_fl(message.text, float(a[0]))
+                else:
+                    ans, error_text = is_suitable_price_2_cu(message.text,
+                                                             float(a[0]))
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_prepare_user_price(user_id, a[0] + ";" +
+                                          str(int(100 * float(
+                                              message.text)) / 100))
+
+                mes.send_prepared_post_nm(chat_id, user_id)
+                return
+
+            elif user_step == 30:
+                return
+
+            elif user_step == 31:
+                mes.back_prepare_post_menu(chat_id, message_id, user_id)
+                return
+
+            elif user_step == 70:
+                return
+
+            elif user_step == 71:
+                return
             #
             # elif user_step == 72:
             #     ans, error_text = is_suitable_ups_count(message.text)
@@ -1710,156 +1852,24 @@ def all_left_text_messages(message: telebot.types.Message):
 
             elif user_step == 110:
                 return
-            #
-            # elif user_step == 111:
-            #     ans, error_text = is_suitable_title_cu(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["customer_post"]["title"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 112:
-            #     ans, error_text = is_suitable_description_cu(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["customer_post"][
-            #         "description"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 113:
-            #     return
-            #
-            # elif user_step == 114:
-            #     ans, error_text = is_suitable_contacts_cu(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["customer_post"]["contacts"] = message.text
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 115:
-            #     return
-            #
-            # elif user_step == 116:
-            #     return
-            #
-            # elif user_step == 117:
-            #     ans, error_text = is_suitable_price_cu(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #     users_table[user_id]["customer_post"]["payment_type"] = 2
-            #     users_table[user_id]["customer_post"]["price"] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     users_table[user_id]["editing_customer_post"] = {}
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 118:
-            #     ans, error_text = is_suitable_price_cu(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["editing_customer_post"]["price"][0] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.edit_pbp_nt_2_price_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 119:
-            #     ans, error_text = is_suitable_price_2_cu(message.text,
-            #                                              users_table[user_id][
-            #                                                  "editing_customer_post"][
-            #                                                  "price"][0])
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #     users_table[user_id]["customer_post"]["payment_type"] = 3
-            #     users_table[user_id]["customer_post"]["price"] = [0, 0]
-            #     users_table[user_id]["customer_post"]["price"][0] = \
-            #     users_table[user_id]["editing_customer_post"]["price"][0]
-            #     users_table[user_id]["customer_post"]["price"][1] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     users_table[user_id]["editing_customer_post"] = {}
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 120:
-            #     ans, error_text = is_suitable_price_cu(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["customer_post"]["price"] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 121:
-            #     ans, error_text = is_suitable_price_cu(message.text)
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["customer_post"]["price"][0] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.edit_pbp_price_2_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 122:
-            #     ans, error_text = is_suitable_price_2_cu(message.text,
-            #                                              users_table[user_id][
-            #                                                  "customer_post"][
-            #                                                  "price"][0])
-            #     if not ans:
-            #         mes.text_message(chat_id, error_text)
-            #         return
-            #
-            #     users_table[user_id]["customer_post"]["price"][1] = (
-            #                 int(100 * float(message.text)) / 100)
-            #     wwf.save_table(users_table, P_USERS)
-            #     mes.preview_post_customer_nm(message, users_table[user_id][
-            #         "customer_post"], True)
-            #     mes.edit_pbp_menu_customer_nm(chat_id, user_id)
-            #     return
-            #
-            # elif user_step == 123:
-            #     return
-            #
-            # elif user_step == 124:
-            #     return
+
+            elif user_step == 113:
+                return
+
+            elif user_step == 115:
+                return
+
+            elif user_step == 116:
+                return
+            elif user_step == 123:
+                return
+
+            elif user_step == 124:
+                return
 
     elif message.chat.type == "public":
 
-        if chat_id in ALLOWED_GROUP_CHATS:
+        if chat_id in ADMIN_IDS:
             command = message.text.lower()
             handle_admin_command(command, chat_id, message_id, user_id)
 
@@ -1867,12 +1877,12 @@ def all_left_text_messages(message: telebot.types.Message):
 #
 def handle_admin_command(command: str, chat_id: str or int,
                          message_id: str or int, user_id: str or int):
-    if command[:9] == "/unverify":
-        user_id_to_unverify = command[10:]
-        if user_id_to_unverify[-1] == "]":
-            user_id_to_unverify = user_id_to_unverify[:-1]
-
+    if str(command[:9]) == '/unverify':
         try:
+            user_id_to_unverify = command[10:]
+            if user_id_to_unverify[-1] == "]":
+                user_id_to_unverify = user_id_to_unverify[:-1]
+
             user_id_to_unverify = int(user_id_to_unverify)
 
         except ValueError:
@@ -1880,17 +1890,15 @@ def handle_admin_command(command: str, chat_id: str or int,
             return
 
         db.set_user_verification_status(user_id_to_unverify, False)
-
         mes.text_message(chat_id,
                          "Если пользователь с таким ID существует, то его данные обновлены")
         return
 
     elif command[:7] == "/verify":
-        user_id_to_verify = command[8:]
-        if user_id_to_verify[-1] == "]":
-            user_id_to_verify = user_id_to_verify[:-1]
-
         try:
+            user_id_to_verify = command[8:]
+            if user_id_to_verify[-1] == "]":
+                user_id_to_verify = user_id_to_verify[:-1]
             user_id_to_verify = int(user_id_to_verify)
         except ValueError:
             mes.text_message(chat_id, "Неверный формат id")
@@ -1905,10 +1913,11 @@ def handle_admin_command(command: str, chat_id: str or int,
         pass
 
     elif command[:9] == "/ban_user":
-        user_id_to_ban = command[10:]
-        if user_id_to_ban[-1] == "]":
-            user_id_to_ban = user_id_to_ban[:-1]
         try:
+            user_id_to_ban = command[10:]
+            if user_id_to_ban[-1] == "]":
+                user_id_to_ban = user_id_to_ban[:-1]
+
             user_id_to_ban = int(user_id_to_ban)
         except ValueError:
             mes.text_message(chat_id, "Неверный формат id")

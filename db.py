@@ -531,8 +531,39 @@ def get_prepare_new_user_categories(user_id: str or int):
            (str(user_id),)
 
 
-@d_db_one
+@d_db_empty
 def set_prepare_new_user_categories(user_id: str or int,
                                     categories: str or int):
     return "UPDATE post_prepare SET new_categories = %s WHERE user_id = %s", \
            (str(categories), str(user_id))
+
+
+@d_db_empty
+def set_prepare_payment_info(user_id: str or int, pay_type: str or int, price: str or int):
+    return "UPDATE post_prepare SET pay_type = %s, price = %s " \
+           "WHERE user_id = %s", \
+           (str(user_id), str(pay_type), str(price))
+
+
+@d_db_empty
+def set_prepare_new_user_price(user_id: str or int, price: str or int):
+    return "UPDATE post_prepare SET new_price = %s WHERE user_id = %s", \
+           (str(user_id), )
+
+
+@d_db_one
+def get_prepare_new_user_price(user_id: str or int):
+    return "SELECT new_price FROM post_prepare WHERE user_id = %s", \
+           (str(user_id), )
+
+
+@d_db_one
+def get_prepare_post_type(user_id: str or int):
+    return "SELECT type FROM post_prepare WHERE user_id = %s", (str(user_id), )
+
+
+@d_db_one
+def get_user_info(user_id: str or int):
+    return "SELECT user_id, user_posts_count, manual_ups, spent_money, " \
+           "verified, referral_id, referral_author, banned, " \
+           "notified_ban WHERE user_id = %s", (str(user_id), )
