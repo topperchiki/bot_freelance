@@ -2018,10 +2018,11 @@ def handle_admin_command(command: str, chat_id: str or int,
         elif command[:12] == "/delete_post":
             pass
 
-        elif command[:12] == "/post_info":
+        elif command[:10] == "/post_info":
+            print('defe')
             try:
-                post_info = command[11:]
-
+                post_info = command[13:]
+                print(post_info)
                 post_info = post_info[:-1]
                 post_info = int(post_info)
                 info = db.get_post_all(post_info)
@@ -2031,7 +2032,7 @@ def handle_admin_command(command: str, chat_id: str or int,
                 sms += 'Последний подъём: ' + str(info[11]) + ' руб' + '\n'
                 sms += 'Id создателя: ' + str(info[14]) + '\n'
                 sms += 'Сколько автоподъёмов использовано: ' + str(info[13]) + '\n'
-                sms+= 'Сколько автоподъёмов осталось исполнить: ' + str(info[12]) + '\n'
+                sms += 'Сколько автоподъёмов осталось исполнить: ' + str(info[12]) + '\n'
                 mes.text_message(chat_id, sms)
             except ValueError:
                 mes.text_message(chat_id, "Неверный формат id")
