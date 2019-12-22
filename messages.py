@@ -22,11 +22,6 @@ def main_menu_building(user_id: str or int):
                 types.InlineKeyboardButton('Пригласить друга',
                                            callback_data="referral"))
 
-    mark_up.add(types.InlineKeyboardButton('Мои объявления: ' + str(count), callback_data='postpage:1'),
-                types.InlineKeyboardButton('Новое объявление', callback_data="sideMenu"))
-    mark_up.add(types.InlineKeyboardButton('Платные услуги', callback_data="paidServices"),
-                types.InlineKeyboardButton('Пригласить друга', callback_data="referral"))
-
     return text, mark_up
 
 
