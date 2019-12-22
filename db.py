@@ -566,13 +566,15 @@ def get_prepare_post_type(user_id: str or int):
 def get_user_info(user_id: str or int):
     return "SELECT user_id, user_posts_count, manual_ups, spent_money, " \
            "verified, referral_id, referral_author, banned, " \
-           "notified_ban WHERE user_id = %s", (str(user_id), )
+           "notified_ban FROM users WHERE user_id = %s", (str(user_id), )
 
 
 @d_db_one
-def get_post_info(post_id: str or int):
-    return "SELECT owner_id, title, description, last_up FROM posts " \
-           "WHERE post_id = %s", (str(post_id),)
+def get_post(post_id: str or int):
+    return "SELECT type, title, description, memo, portfolio, contacts, " \
+           "pay_type, price, guarantee, categories " \
+           "FROM posts WHERE post_id = %s", \
+           (str(post_id),)
 
 
 @d_db_one
@@ -582,7 +584,8 @@ def get_rate_info(rate_id: str or int):
 
 
 @d_db_empty
-def add_rate(rate_id: str or int, update_time: str or int, price: str or int, showed: bool=False):
+def add_rate(rate_id: str or int, update_time: str or int, price: str or int,
+             showed: bool=False):
     return "INSERT INTO rates (rate_id, update_time, price, showed) " \
            "VALUES (%s, %s, %s, %s)", \
            (str(rate_id), str(update_time), str(price), str(showed))
@@ -592,3 +595,45 @@ def add_rate(rate_id: str or int, update_time: str or int, price: str or int, sh
 def set_rate_showed_status(rate_id: str or int, value: bool):
     return "UPDATE rates SET showed = %s WHERE rate_id = %s", \
            (str(rate_id), str(value))
+
+
+@d_db_one
+def get_prepare_post_all(user_id: str or int):
+    return "SELECT type, title, description, memo, portfolio, contacts, " \
+           "categories, price, pay_type, guarantee " \
+           "FROM post_prepare WHERE user_id = %s", \
+           (str(user_id), )
+
+
+@d_db_empty
+def add_post(post_id: str or int, user_id: str or int,
+             creation_date: int or str,  last_up: str or int,
+             post_type: int or str, title: str, description: str, memo: str,
+             portfolio: str, contacts: str, categories: str, price: str,
+             pay_type: str, guarantee: bool):
+    return "INSERT INTO posts(post_id, owner_id, creation_date, last_up, " \
+           "type, title, description, memo, portfolio, contacts, categories, " \
+           "price, pay_type, guarantee) " \
+           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",\
+           (str(post_id), str(user_id), str(creation_date), str(last_up),
+            str(post_type), title, description, memo, portfolio, contacts, categories,
+            price, pay_type, str(guarantee))
+
+
+@d_db_one
+def is_post_id_exist(post_id: int or str):
+    return "SELECT post_id FROM posts WHERE post_id = %s", (str(post_id), )
+
+
+@d_db_one
+def get_post_owner_id(post_id: str or int):
+    return "SELECT owner_id FROM posts WHERE post_id = %s", (str(post_id), )
+
+
+@d_db_one
+def get_post_all(user_id: str or int):
+    return "SELECT type, title, description, memo, portfolio, contacts, " \
+           "categories, price, pay_type, guarantee, creation_date, last_up, " \
+           "auto_ups, auto_ups_used, owner_id " \
+           "FROM post_prepare WHERE user_id = %s", \
+           (str(user_id),)

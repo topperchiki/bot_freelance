@@ -452,37 +452,23 @@ def query_handler(call):
                 elif post_type == 2:
                     if user_step not in POSSIBLE_COME_TO_POST_CU:
                         return
-                return
-                new_id = random.randint(100000, 999999)
-                while db.is_post_id_used(new_id):
-                    new_id = random.randint(100000, 999999)
+                all_post = db.get_prepare_post_all(user_id)
+                new_post_id = random.randint(1, 1000000)
+                while bool(db.is_post_id_exist(new_post_id)[0]):
+                    new_post_id = random.randint(1, 1000000)
 
-                new_id = str(new_id)
-                # # TODO FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                # ans = mes.post_nm(ID_POST_CHANNEL, users_table[user_id]["freelance_post"])
-                # posts_table[new_id] = users_table[user_id]["freelance_post"]
-                # posts_table[new_id]["time_published"] = time.time()
-                # posts_table[new_id]["time_upped"] = posts_table[new_id]["time_published"]
-                # ownership_table[user_id].append(new_id)
-                # wwf.save_table(ownership_table, P_OWNERSHIPS)
-                #
-                # posts_table[new_id]["published"] = True
-                #
-                # wwf.save_table(posts_table, P_POSTS)
-                # dposts_table = wwf.load_table(P_D_POSTS)
-                # t = posts_table[new_id]["time_published"] + 169200
-                # if t in dposts_table:
-                #     dposts_table[t].append({"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0})
-                # else:
-                #     dposts_table[t] = [{"cid": ID_POST_CHANNEL, "mid": ans.message_id, "replace": 0}]
-                # wwf.save_table(dposts_table, P_D_POSTS)
-                #
-                # keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-                # keyboard.add(telebot.types.InlineKeyboardButton(text="Опубликовано ✅", callback_data="noAnswer"))
-                # tb.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                #                              reply_markup=keyboard)
-                # mes.posted(call.message, new_id)
-                # return
+                creation_date = time.time()
+                db.add_post(new_post_id, user_id, creation_date, creation_date,
+                            time.time(), *all_post)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(
+                    text="Опубликовано ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+                mes.send_post(chat_id, new_post_id)
+                return
 
             elif call_data_lowered[:8] == "postpage":
                 page = call_data_lowered[9:]
@@ -833,6 +819,25 @@ def query_handler(call):
 
                     mes.edit_pbp_guarantee(chat_id, user_id, post_type)
                     return
+
+            elif call_data_lowered[:3] == "get":
+                post_id = call_data_lowered[4:]
+
+                try:
+                    post_id = str(post_id)
+                except ValueError:
+                    return
+                try:
+                    owner_id = db.get_post_owner_id(post_id)[0]
+                    if owner_id != user_id:
+                        mes.text_message(chat_id, "Нельзя посмотреть чужое объявление")
+                        return
+                except FailedCallDatabase:
+                    mes.text_message(chat_id, "Объявления с таким id не существует")
+                    return
+
+                mes.get_post_nm(chat_id, post_id)
+                return
 
             # elif call_data_lowered == "verification":
             #
@@ -1940,13 +1945,12 @@ def handle_admin_command(command: str, chat_id: str or int,
             if user_id_to_ban[-1] == "]":
                 user_id_to_ban = user_id_to_ban[:-1]
             user_id_to_ban = int(user_id_to_ban)
-            db.set_ban_status(True, user_id_to_ban)
+            db.set_ban_status(user_id, True)
             mes.text_message(chat_id,
                              "Пользователь успешно забанен, его объявления удалены, автоподьемы обнулены, доступ к платформе заблокирован ")
         except ValueError:
             mes.text_message(chat_id, "Неверный формат id")
             return
-
 
         return
 
@@ -1983,7 +1987,6 @@ def handle_admin_command(command: str, chat_id: str or int,
             mes.text_message(chat_id, "Неверный формат id")
             return
 
-
         return
 
     elif command[:11] == "/list_posts":
@@ -1998,11 +2001,14 @@ def handle_admin_command(command: str, chat_id: str or int,
     elif command[:12] == "/clear_cache":
         pass
 
+
 def set_code(user_id,code,chat_id):
     print(code)
     db.set_referral_code(code, user_id)
     mes.text_message(chat_id,
                      "Пользователю успешно присвоен реферальный код ")
+
+
 #
 def adding_new_user(user_id: str):
     db.add_user(user_id, int(time.time()))

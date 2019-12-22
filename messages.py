@@ -297,6 +297,73 @@ def edit_pbp_payment_type_building(post_type=1):
     return text, keyboard
 
 
+def get_post_building(post_id: str or int):
+    post_id = str(post_id)
+
+    post = db.get_post_all(post_id)
+    text = ""
+    # Разные части
+    if post[0] == 1:  # Freelance
+        text = "#Исполнитель\nНазвание: " + post[1] + "\n\nОписание: " + \
+               post[2] + "\n"
+        text += "Памятка: " + (post[3] if bool(post[3]) else "нет")
+
+    elif post[0] == 2:  # Customer
+        text = "#Заказчик\nНазвание: " + post[1] + "\n\nОписание: " + \
+               post[2] + "\n"
+        text += "Портфолио: " + (
+            "необходимо" if bool(post[4]) else "необязательно")
+
+    # Общая часть
+    text += "\nКонтакты: " + post[5] + "\n\n"
+    categories = [int(i) for i in post[6].split()]
+    hashtags = db.get_hashtags_categories_with_ids(categories)
+    d = dict()
+    for i in hashtags:
+        d[i[0]] = d[1]
+
+    for cat in post["categories"]:
+        text += d[cat] + " "
+    text += "\n"
+    if post[8] == 1:
+        text += "Договорная"
+    elif post[8] == 2:
+        text += str(post[7]) + " $"
+    elif post[8] == 3:
+        a, b = post[7].split(";")
+        text += "От " + a + " до " + b + " $"
+
+    text += "\n"
+    text += "Гарант: " + ("✅" if post[9] else "❌") + "\n\n"
+    if post["type"] == 2:
+        text += "Портфолио: " + (
+            "необходимо\n" if post[4] else "необязательно\n")
+    text += "Опубликовано: " + time.strftime("%H:%M:%S %d.%m.%Y",
+                                             time.gmtime(post[10])) + "\n"
+    text += "Поднято последний раз: " + time.strftime("%H:%M:%S %d.%m.%Y",
+                                                      time.gmtime(post[11]))
+
+    text += "\n"
+    if post[11]:
+        rate_time = db.get_rate_time(post[11])[0]
+        text += "Подъемы раз в " + nice_time(rate_time) + \
+                "✅, осталось " + str(post[12])
+        text += "\n"
+    else:
+        text += "Нет подъемов\n"
+
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    if post["type"] == 1 and len(post["portfolio"]) > 0:
+        keyboard.add(
+            types.InlineKeyboardButton(text="Портфолио", url=post[4]))
+    keyboard.add(types.InlineKeyboardButton(text="Редактировать",
+                                            callback_data="edit:" + post_id))
+    manual_ups = db.get_user_manual_ups(post[12])
+    keyboard.add(types.InlineKeyboardButton(text="Поднять (" + str(manual_ups) + ")", callback_data="up:" + post_id))
+    keyboard.add(types.InlineKeyboardButton(text="Купить подъемы", callback_data="buyingUpsMenu:" + post_id))
+    return text, keyboard
+
+
 #
 def main_menu_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 1)
@@ -1049,3 +1116,77 @@ def edit_pbp_payment_type_nm(chat_id: str or int, user_id: str or int, post_type
 
     tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
 
+
+def send_post(chat_id: str or int, post_id: str or int):
+    post = db.get_post(post_id)
+
+    text = ""
+    if post[0] == 1:
+        text += "#Исполнитель\n\n"
+    else:
+        text += "#Заказчик\n\n"
+
+    text += "\n\n"
+    text += "<b>Название:</b> " + post[1] + "\n"
+    text += "<b>Описание:</b> " + post[2] + "\n"
+    if post[0] == 1:
+        text += ("<b>Памятка заказчику:</b> " + post[3] +
+                 "\n" if len(post[3]) > 0 else "")
+    else:
+        text += ("<b>Портфолио:</b> необходимо\n" if bool(
+            post[4]) else "<b>Портфолио:</b> необязательно\n")
+    text += "<b>Контакты:</b> " + post[5] + "\n"
+    text += "<b>Гарант:</b> " + ("✅" if post[8] else "❌") + "\n\n"
+    if post[6] == 1:
+        text += "<b>Договорная</b>, "
+    elif post[6] == 2:
+        text += "<b>" + str(post[7]) + " $</b>, "
+    elif post[6] == 3:
+        a, b = post[7].split(";")
+        text += "<b>" + str(a) + " - " + str(b) + " $</b>, "
+    categories = [int(i) for i in post[9].split()]
+    hashtags = db.get_hashtags_categories_with_ids(categories)
+    d = dict()
+    for i in hashtags:
+        d[hashtags[0]] = hashtags[1]
+
+    for cat in categories:
+        text += d[cat] + ", "
+
+    text = text[:-2] + "\n"
+    text += "\n===============\nПодать объявление можно с помощью бота @" + BOT_USERNAME
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    if bool(post[4]) and post[0] == 1:
+        keyboard.add(types.InlineKeyboardButton(text="Портфолио",
+                                                url=post[4]))
+
+    keyboard.add(types.InlineKeyboardButton(text="Пожаловаться",
+                                            callback_data="report:" + post_id))
+    return tb.send_message(chat_id=chat_id, text=text, reply_markup=keyboard,
+                           parse_mode="html")
+
+
+def posted(chat_id: str or int, user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 69)
+
+    post_id = str(post_id)
+    text = "Успешно опубликовано\nID вашего объявления " + post_id
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(text="Купить подъемы",
+                                            callback_data="buyingUpsMenu:" + post_id))
+    keyboard.add(types.InlineKeyboardButton(text="В главное меню",
+                                            callback_data="mainMenu"))
+    tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
+
+
+def get_post(chat_id: str or int, message_id: str or int, post_id: str or int):
+    text, keyboard = get_post_building(post_id)
+
+    tb.edit_message_text(text=text, chat_id=chat_id, message_id=message_id,
+                         reply_markup=keyboard)
+
+
+def get_post_nm(chat_id: str or int, post_id: str or int):
+    text, keyboard = get_post_building(post_id)
+
+    tb.edit_message_text(text=text, chat_id=chat_id, reply_markup=keyboard)

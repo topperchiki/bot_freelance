@@ -90,6 +90,7 @@ def create_posts_table(connection: psycopg2.extensions.connection):
                                guarantee BOOLEAN,
 
                                auto_ups INT DEFAULT 0,
+                               auto_ups_used INT DEFAULT 0,
                                rate_id INT DEFAULT 0,
                                last_up INT DEFAULT 0,
 
