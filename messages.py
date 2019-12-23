@@ -290,6 +290,7 @@ def edit_pbp_payment_type_building(post_type=1):
     return text, keyboard
 
 
+<<<<<<< HEAD
 def get_post_building(post_id: str or int):
     post_id = str(post_id)
 
@@ -1195,3 +1196,5 @@ def send_prepared_post(chat_id: str or int, message_id: str or int,
     else:
         tb.edit_message_text(chat_id=chat_id, text=text, message_id=message_id,
                              reply_markup=keyboard)
+=======
+>>>>>>> 7e3dc1365c603008abc7338c70c556f7ae2ed4d0

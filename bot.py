@@ -33,11 +33,13 @@ def start_menu(message: telebot.types.Message):
             ref_code = message.text[8:]
             try:
                 u_id, count = db.get_referral_code_info(ref_code)
-                count += 1
-                db.set_referral_code_user_count(u_id, count)
-                if count % 5 == 0 and count != 0:
-                    count = db.get_manual_ups(u_id) + 1
-                    db.set_manual_ups(u_id, count)
+                if u_id!= user_id:
+                    db.set_user_referral_code(user_id,u_id)
+                    count += 1
+                    db.set_referral_code_user_count(u_id, count)
+                    if count % 5 == 0 and count != 0:
+                        count = db.get_manual_ups(u_id) + 1
+                        db.set_manual_ups(u_id, count)
 
             except Exception:
                 tb.send_message(chat_id, 'Неверный код')
@@ -2039,104 +2041,144 @@ def all_left_text_messages(message: telebot.types.Message):
 #
 def handle_admin_command(command: str, chat_id: str or int,
                          message_id: str or int, user_id: str or int):
-    if str(command[:9]) == '/unverify':
-        try:
-            user_id_to_unverify = command[10:]
-            if user_id_to_unverify[-1] == "]":
+    try:
+        if str(command[:9]) == '/unverify':
+            try:
+                user_id_to_unverify = command[10:]
+
                 user_id_to_unverify = user_id_to_unverify[:-1]
 
-            user_id_to_unverify = int(user_id_to_unverify)
+                user_id_to_unverify = int(user_id_to_unverify)
 
-        except ValueError:
-            mes.text_message(chat_id, "Неверный формат id")
+            except ValueError:
+                mes.text_message(chat_id, "Неверный формат id")
+                return
+
+            db.set_user_verification_status(user_id_to_unverify, False)
+            mes.text_message(chat_id,
+                             "Если пользователь с таким ID существует, то его данные обновлены")
             return
 
-        db.set_user_verification_status(user_id_to_unverify, False)
-        mes.text_message(chat_id,
-                         "Если пользователь с таким ID существует, то его данные обновлены")
-        return
+        elif command[:7] == "/verify":
+            try:
+                user_id_to_verify = command[8:]
 
-    elif command[:7] == "/verify":
-        try:
-            user_id_to_verify = command[8:]
-            if user_id_to_verify[-1] == "]":
                 user_id_to_verify = user_id_to_verify[:-1]
-            user_id_to_verify = int(user_id_to_verify)
-        except ValueError:
-            mes.text_message(chat_id, "Неверный формат id")
+                user_id_to_verify = int(user_id_to_verify)
+            except ValueError:
+                mes.text_message(chat_id, "Неверный формат id")
+                return
+
+            db.set_user_verification_status(user_id_to_verify, True)
+            mes.text_message(chat_id,
+                             "Если пользователь с таким ID существует, то его данные обновлены")
             return
 
-        db.set_user_verification_status(user_id_to_verify, True)
-        mes.text_message(chat_id,
-                         "Если пользователь с таким ID существует, то его данные обновлены")
-        return
+        elif command[:10] == "/user_info":
 
-    elif command[:10] == "/user_info":
-        a = db.get_user_info(419887691)
-        print(a)
+            try:
+                user_id_to_info= command[11:]
 
-    elif command[:9] == "/ban_user":
-        try:
-            user_id_to_ban = command[10:]
+                user_id_to_info = user_id_to_info[:-1]
+                user_id_to_info = int(user_id_to_info)
+                info = db.get_user_info(user_id_to_info)
+                sms = 'ID пользователя: ' + str(info[0]) + '\n'
+                sms += 'Постов у юзера: ' + str(info[1]) + '\n'
+                sms += 'Ручных апов: ' + str(info[2]) + '\n'
+                sms += 'Потрачено денег: : ' + str(info[3]) + ' руб' + '\n'
+                sms += 'Верифицирован: ' + str(info[4]) + '\n'
+                sms += 'Наличие бана: ' + str(info[7]) + '\n'
+                mes.text_message(chat_id, sms)
+            except ValueError:
+                mes.text_message(chat_id, "Неверный формат id")
+                return
 
-            if user_id_to_ban[-1] == "]":
+        elif command[:9] == "/ban_user":
+            try:
+                user_id_to_ban = command[10:]
+
+
                 user_id_to_ban = user_id_to_ban[:-1]
-            user_id_to_ban = int(user_id_to_ban)
-            db.set_ban_status(user_id, True)
-            mes.text_message(chat_id,
-                             "Пользователь успешно забанен, его объявления удалены, автоподьемы обнулены, доступ к платформе заблокирован ")
-        except ValueError:
-            mes.text_message(chat_id, "Неверный формат id")
+                user_id_to_ban = int(user_id_to_ban)
+                db.set_ban_status(True,user_id_to_ban)
+                mes.text_message(chat_id,
+                                 "Пользователь успешно забанен, его объявления удалены, автоподьемы обнулены, доступ к платформе заблокирован ")
+            except ValueError:
+                mes.text_message(chat_id, "Неверный формат id")
+                return
+
             return
 
-        return
+        elif command[:12] == "/delete_user":
+            pass
 
-    elif command[:12] == "/delete_user":
-        pass
+        elif command[:11] == "/user_posts":
+            pass
 
-    elif command[:11] == "/user_posts":
-        pass
+        elif command[:10] == "/hide_rate":
+            pass
 
-    elif command[:10] == "/hide_rate":
-        pass
+        elif command[:12] == "/delete_rate":
+            pass
 
-    elif command[:12] == "/delete_rate":
-        pass
+        elif command[:12] == "/create_rate":
+            pass
 
-    elif command[:12] == "/create_rate":
-        pass
+        elif command[:10] == "/show_rate":
+            pass
 
-    elif command[:10] == "/show_rate":
-        pass
+        elif command[:18] == "/set_referral_code":
+            # До 30 символов! (включительно)
+            try:
+                user_id_to_ref = command[19:]
+                i = 0
+                while user_id_to_ref[i]!=']':
+                    i +=1
+                code = user_id_to_ref[i+2:len(user_id_to_ref)-1]
+                user_id_to_ref = user_id_to_ref[:i]
+                user_id_to_ref = int(user_id_to_ref)
+                print(code)
+                print(user_id_to_ref)
 
-    elif command[:18] == "/set_referral_code":
-        # До 30 символов! (включительно)
-        try:
-            user_id_to_ref = command[19:]
-            if user_id_to_ref[-1] == "]":
-                user_id_to_ban = user_id_to_ref[:-1]
-            user_id_to_ref = int(user_id_to_ref)
-            mes.text_message(chat_id,
-                             "Отправьте пожалуйста код для реферальной ссылки")
-            code = mes.take_text_mes()
-            set_code(user_id_to_ref, code, chat_id)
-        except ValueError:
-            mes.text_message(chat_id, "Неверный формат id")
+                db.set_referral_code(code, user_id)
+                mes.text_message(chat_id,
+                                 "Пользователю успешно присвоен реферальный код ")
+            except ValueError:
+                mes.text_message(chat_id, "Неверный формат id")
+                return
+
             return
 
+        elif command[:11] == "/list_posts":
+            pass
+
+        elif command[:12] == "/delete_post":
+            pass
+
+        elif command[:10] == "/post_info":
+            try:
+                post_info = command[13:]
+                print(post_info)
+                post_info = post_info[:-1]
+                post_info = int(post_info)
+                info = db.get_post_all(post_info)
+                sms = 'Тип обьявления: ' + str(info[0]) + '\n'
+                sms += 'Загаловок: ' + str(info[1]) + '\n'
+                sms += 'Дата создания: ' + str(info[10]) + '\n'
+                sms += 'Последний подъём: ' + str(info[11]) + ' руб' + '\n'
+                sms += 'Id создателя: ' + str(info[14]) + '\n'
+                sms += 'Сколько автоподъёмов использовано: ' + str(info[13]) + '\n'
+                sms += 'Сколько автоподъёмов осталось исполнить: ' + str(info[12]) + '\n'
+                mes.text_message(chat_id, sms)
+            except ValueError:
+                mes.text_message(chat_id, "Неверный формат id")
+                return
+
+        elif command[:12] == "/clear_cache":
+            pass
+    except ValueError:
+        mes.text_message(chat_id, "Неверный формат id")
         return
-
-    elif command[:11] == "/list_posts":
-        pass
-
-    elif command[:12] == "/delete_post":
-        pass
-
-    elif command[:12] == "/post_info":
-        pass
-
-    elif command[:12] == "/clear_cache":
-        pass
 
 
 def set_code(user_id, code, chat_id):
@@ -2175,6 +2217,10 @@ def auto_actions():
                 db.delete_auto_action_with_message_id(action[5])
         time.sleep(120)
 
+
+def take_mes(message):
+    a = message.text
+    return a
 
 #
 if __name__ == "__main__":
