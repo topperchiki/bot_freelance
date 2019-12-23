@@ -98,7 +98,7 @@ def help_and_tips(message: telebot.types.Message):
 
 
 @tb.message_handler(commands=['myposts'])
-def help_and_tips(message: telebot.types.Message):
+def myposts(message: telebot.types.Message):
     with open(P_ACTIONS, "a") as f:
         f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ",
                               time.gmtime(time.time())) + str(
@@ -379,12 +379,20 @@ def query_handler(call):
 
                 try:
                     ans = call.data[13:]
-                    ans = bool(ans)
+                    ans = bool(int(ans))
                 except ValueError or KeyError:
                     mes.text_message(chat_id, "Неверный вариант")
                     return
 
                 db.set_prepare_user_guarantee(user_id, ans)
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                if ans:
+                    keyboard.add(telebot.types.InlineKeyboardButton(text="Да ✅", callback_data="noAnswer"))
+                else:
+                    keyboard.add(telebot.types.InlineKeyboardButton(text="Нет ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
                 mes.send_prepared_post_nm(chat_id, user_id)
                 return
 
@@ -432,7 +440,7 @@ def query_handler(call):
                     mes.set_contacts_customer_post_nm(chat_id, user_id)
                     return
 
-            elif call_data_lowered == "preview_post":
+            elif call_data_lowered[:12] == "preview_post":
                 post_type = (1 if call_data_lowered[13:15] == "fr" else 2)
                 if post_type == 1:
                     if user_step not in POSSIBLE_COME_TO_PREVIEW_POST_FR:
@@ -441,33 +449,16 @@ def query_handler(call):
                     if user_step not in POSSIBLE_COME_TO_PREVIEW_POST_CU:
                         return
 
-                mes.send_prepared_post_nm(chat_id, user_id)
-                return
+                left_part = call_data_lowered[16:]
+                if left_part == "bm":
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Назад ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
 
-            elif call_data_lowered == "post":
-                post_type = (1 if call_data_lowered[5:7] == "fr" else 2)
-                if post_type == 1:
-                    if user_step not in POSSIBLE_COME_TO_POST_FR:
-                        return
-                elif post_type == 2:
-                    if user_step not in POSSIBLE_COME_TO_POST_CU:
-                        return
-                all_post = db.get_prepare_post_all(user_id)
-                new_post_id = random.randint(1, 1000000)
-                while bool(db.is_post_id_exist(new_post_id)[0]):
-                    new_post_id = random.randint(1, 1000000)
-
-                creation_date = time.time()
-                db.add_post(new_post_id, user_id, creation_date, creation_date,
-                            time.time(), *all_post)
-
-                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
-                keyboard.add(telebot.types.InlineKeyboardButton(
-                    text="Опубликовано ✅", callback_data="noAnswer"))
-                tb.edit_message_reply_markup(chat_id=chat_id,
-                                             message_id=message_id,
-                                             reply_markup=keyboard)
-                mes.send_post(chat_id, new_post_id)
+                mes.send_prepared_post(chat_id, message_id, user_id)
                 return
 
             elif call_data_lowered[:8] == "postpage":
@@ -479,6 +470,32 @@ def query_handler(call):
                     return
 
                 mes.send_posts_page(chat_id, message_id, user_id, page)
+                return
+
+            elif call_data_lowered[:4] == "post":
+                post_type = (1 if call_data_lowered[5:7] == "fr" else 2)
+                if post_type == 1:
+                    if user_step not in POSSIBLE_COME_TO_POST_FR:
+                        return
+                elif post_type == 2:
+                    if user_step not in POSSIBLE_COME_TO_POST_CU:
+                        return
+                all_post = [str(i) for i in db.get_prepare_post_all(user_id)]
+                new_post_id = random.randint(1, 1000000)
+                while bool(db.is_post_id_exist(new_post_id)):
+                    new_post_id = random.randint(1, 1000000)
+
+                creation_date = int(time.time())
+                db.add_post(new_post_id, user_id, creation_date, creation_date,
+                            *all_post)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(
+                    text="Опубликовано ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+                mes.send_post(chat_id, new_post_id)
                 return
 
             elif call_data_lowered[:8] == "edit_pbp":
@@ -493,6 +510,11 @@ def query_handler(call):
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_MENU_CU:
                             return
 
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(text="К редактированию ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
                     db.set_prepare_new_user_categories(user_id, "")
                     mes.edit_pbp_menu_nm(chat_id, user_id, post_type)
                     return
@@ -520,7 +542,7 @@ def query_handler(call):
 
                         categories_str = \
                         db.get_prepare_new_user_categories(user_id)[0]
-                        if categories_str:
+                        if parent_category_id != "1" and categories_str:
                             categories_str += ";" + parent_category_id
                         else:
                             categories_str = parent_category_id
@@ -592,7 +614,7 @@ def query_handler(call):
 
                     return
 
-                elif left_part == "title":
+                elif left_part[:5] == "title":
                     post_type = (1 if left_part[6:8] == "fr" else 2)
                     if post_type == 1:
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_TITLE_FR:
@@ -600,10 +622,17 @@ def query_handler(call):
                     elif post_type == 2:
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_TITLE_CU:
                             return
+
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Название ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
                     mes.edit_pbp_title_nm(chat_id, user_id, post_type)
                     return
 
-                elif left_part == "description":
+                elif left_part[:11] == "description":
                     post_type = (1 if left_part[12:14] == "fr" else 2)
                     if post_type == 1:
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_DESCRIPTION_FR:
@@ -611,16 +640,30 @@ def query_handler(call):
                     elif post_type == 2:
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_DESCRIPTION_CU:
                             return
+
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Описание ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
                     mes.edit_pbp_description_nm(chat_id, user_id, post_type)
                     return
 
-                elif left_part == "memo":
+                elif left_part[:4] == "memo":
                     if user_step not in POSSIBLE_COME_TO_EDIT_PBP_MEMO:
                         return
+
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Памятку ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
                     mes.edit_pbp_memo_nm(chat_id, user_id)
                     return
 
-                elif left_part == "portfolio":
+                elif left_part[:9] == "portfolio":
                     post_type = (1 if left_part[10:12] == "fr" else 2)
 
                     if post_type == 1:
@@ -631,25 +674,90 @@ def query_handler(call):
                                 return
 
                             db.set_prepare_user_portfolio(user_id, "")
+                            keyboard = telebot.types.InlineKeyboardMarkup(
+                                row_width=1)
+                            keyboard.add(telebot.types.InlineKeyboardButton(
+                                text="Нет портфолио ✅", callback_data="noAnswer"))
+                            tb.edit_message_reply_markup(chat_id=chat_id,
+                                                         message_id=message_id,
+                                                         reply_markup=keyboard)
                             mes.send_prepared_post_nm(chat_id, user_id)
                             return
 
                         else:
                             if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PORTFOLIO_FR:
                                 return
-                            mes.edit_pbp_portfolio_nm(chat_id, user_id)
 
+                            keyboard = telebot.types.InlineKeyboardMarkup(
+                                row_width=1)
+                            keyboard.add(telebot.types.InlineKeyboardButton(
+                                text="Портфолио ✅", callback_data="noAnswer"))
+                            tb.edit_message_reply_markup(chat_id=chat_id,
+                                                         message_id=message_id,
+                                                         reply_markup=keyboard)
+                            mes.edit_pbp_portfolio_nm(chat_id, user_id)
                             return
 
                     elif post_type == 2:
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PORTFOLIO_CU:
                             return
 
-                        mes.edit_pbp_portfolio(chat_id, message_id, user_id)
+                        left_part_another = left_part[13:]
+
+                        if len(left_part_another) == 0:
+                            keyboard = telebot.types.InlineKeyboardMarkup(
+                                row_width=1)
+                            keyboard.add(
+                                telebot.types.InlineKeyboardButton(
+                                    text="Портфолио ✅",
+                                    callback_data="noanswer"))
+
+                            # Удаляем предыдущую клавиатуру
+                            tb.edit_message_reply_markup(chat_id=chat_id,
+                                                         message_id=message_id,
+                                                         reply_markup=keyboard)
+                            db.set_prepare_user_portfolio(user_id, "1")
+                            mes.edit_pbp_portfolio(chat_id, message_id, user_id)
+                            return
+
+
+                        try:
+                            ans = bool(int(left_part_another))
+                        except ValueError:
+                            return
+
+                        if ans:
+                            keyboard = telebot.types.InlineKeyboardMarkup(
+                                row_width=1)
+                            keyboard.add(
+                                telebot.types.InlineKeyboardButton(
+                                    text="Да ✅",
+                                    callback_data="noanswer"))
+
+                            # Удаляем предыдущую клавиатуру
+                            tb.edit_message_reply_markup(chat_id=chat_id,
+                                                         message_id=message_id,
+                                                         reply_markup=keyboard)
+                            db.set_prepare_user_portfolio(user_id, "1")
+                        else:
+                            keyboard = telebot.types.InlineKeyboardMarkup(
+                                row_width=1)
+                            keyboard.add(
+                                telebot.types.InlineKeyboardButton(
+                                    text="Нет ✅",
+                                    callback_data="noanswer"))
+
+                            # Удаляем предыдущую клавиатуру
+                            tb.edit_message_reply_markup(chat_id=chat_id,
+                                                         message_id=message_id,
+                                                         reply_markup=keyboard)
+                            db.set_prepare_user_portfolio(user_id, "")
+
+                        mes.send_prepared_post_nm(chat_id, user_id)
                         return
 
-                elif left_part == "contacts":
-                    post_type = (1 if left_part[10:12] == "fr" else 2)
+                elif left_part[:8] == "contacts":
+                    post_type = (1 if left_part[9:11] == "fr" else 2)
 
                     if post_type == 1:
                         if user_step not in POSSIBLE_COME_TO_EDIT_CONTACTS_FR:
@@ -659,26 +767,18 @@ def query_handler(call):
                         if user_step not in POSSIBLE_COME_TO_EDIT_CONTACTS_CU:
                             return
 
+                    keyboard = telebot.types.InlineKeyboardMarkup(
+                        row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Контакты ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
                     mes.edit_pbp_contacts_nm(chat_id, user_id, post_type)
                     return
 
-                elif left_part == "payment":
-                    post_type = (1 if left_part[8:10] == "fr" else 2)
-
-                    if post_type == 1:
-                        if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENT_FR:
-                            return
-
-                    elif post_type == 2:
-                        if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENT_CU:
-                            return
-
-                    mes.edit_pbp_payment_menu(chat_id, message_id, user_id)
-                    return
-
-                elif left_part == "payment_type":
+                elif left_part[:12] == "payment_type":
                     post_type = (1 if left_part[13:15] == "fr" else 2)
-
                     if post_type == 1:
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENTTYPE_FR:
                             return
@@ -687,7 +787,7 @@ def query_handler(call):
                         if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENTTYPE_CU:
                             return
 
-                    pay_data = call.data[15:]
+                    pay_data = left_part[16:]
 
                     if pay_data == "m":  # menu
                         mes.edit_pbp_payment_type(chat_id, message_id, user_id,
@@ -716,7 +816,7 @@ def query_handler(call):
                         tb.edit_message_reply_markup(chat_id=chat_id,
                                                      message_id=message_id,
                                                      reply_markup=keyboard)
-
+                        db.set_prepare_user_payment_type(user_id, 1)
                         mes.send_prepared_post_nm(chat_id, user_id)
                         return
 
@@ -747,7 +847,21 @@ def query_handler(call):
                         mes.edit_pbp_range_price_1_nm(chat_id, user_id, post_type)
                         return
 
-                elif left_part == "price":
+                elif left_part[:7] == "payment":
+                    post_type = (1 if left_part[8:10] == "fr" else 2)
+
+                    if post_type == 1:
+                        if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENT_FR:
+                            return
+
+                    elif post_type == 2:
+                        if user_step not in POSSIBLE_COME_TO_EDIT_PBP_PAYMENT_CU:
+                            return
+
+                    mes.edit_pbp_payment_menu(chat_id, message_id, user_id)
+                    return
+
+                elif left_part[:5] == "price":
                     post_type = (1 if left_part[6:8] == "fr" else 2)
 
                     if post_type == 1:
@@ -771,7 +885,7 @@ def query_handler(call):
                     mes.edit_pbp_price_nm(chat_id, user_id, post_type)
                     return
 
-                elif left_part == "price_2":
+                elif left_part[:7] == "price_2":
                     post_type = (1 if left_part[8:10] == "fr" else 2)
 
                     if post_type == 1:
@@ -796,7 +910,7 @@ def query_handler(call):
                     mes.edit_pbp_price_range_nm(chat_id, user_id, post_type)
                     return
 
-                elif left_part == "guarantee":
+                elif left_part[:9] == "guarantee":
                     post_type = (1 if left_part[10:12] == "fr" else 2)
 
                     if post_type == 1:
@@ -809,15 +923,29 @@ def query_handler(call):
 
                     if left_part_another == "y":
                         db.set_prepare_user_guarantee(user_id, True)
+                        keyboard = telebot.types.InlineKeyboardMarkup(
+                            row_width=1)
+                        keyboard.add(telebot.types.InlineKeyboardButton(
+                            text="Да ✅", callback_data="noAnswer"))
+                        tb.edit_message_reply_markup(chat_id=chat_id,
+                                                     message_id=message_id,
+                                                     reply_markup=keyboard)
                         mes.send_prepared_post_nm(chat_id, user_id)
                         return
 
                     elif left_part_another == "n":
                         db.set_prepare_user_guarantee(user_id, False)
+                        keyboard = telebot.types.InlineKeyboardMarkup(
+                            row_width=1)
+                        keyboard.add(telebot.types.InlineKeyboardButton(
+                            text="Нет ✅", callback_data="noAnswer"))
+                        tb.edit_message_reply_markup(chat_id=chat_id,
+                                                     message_id=message_id,
+                                                     reply_markup=keyboard)
                         mes.send_prepared_post_nm(chat_id, user_id)
                         return
 
-                    mes.edit_pbp_guarantee(chat_id, user_id, post_type)
+                    mes.edit_pbp_guarantee(chat_id, message_id, user_id, post_type)
                     return
 
             elif call_data_lowered[:3] == "get":
@@ -1038,7 +1166,7 @@ def all_left_text_messages(message: telebot.types.Message):
                 return
 
             elif user_step == 26:
-                mes.edit_pbp_fixed_price_nm(chat_id, user_id)
+                mes.edit_pbp_range_price_1_nm(chat_id, user_id)
                 return
 
             elif user_step == 27:
@@ -1268,6 +1396,15 @@ def all_left_text_messages(message: telebot.types.Message):
                 "главное меню":
 
             mes.main_menu_nm(chat_id, user_id)
+        elif len(lowered_message) > 10 and lowered_message[:10] == "/open_post" and lowered_message[11:] != "число":
+            post_id = message.text[11:]
+
+            if db.get_post_owner_id(post_id)[0] != int(user_id):
+                mes.text_message(chat_id, "Ошибка")
+                return
+
+            mes.get_post_nm(chat_id, post_id)
+            return
 
         else:
             if user_step == 1:
@@ -1474,14 +1611,14 @@ def all_left_text_messages(message: telebot.types.Message):
                                               int(100 * float(
                                                   message.text)) / 100)
                 if user_step == 25:
-                    mes.edit_pbp_range_price_1_nm(chat_id, user_id, 1)
+                    mes.edit_pbp_range_price_2_nm(chat_id, user_id, 1)
                 else:
-                    mes.edit_pbp_range_price_1_nm(chat_id, user_id, 2)
+                    mes.edit_pbp_range_price_2_nm(chat_id, user_id, 2)
                 return
 
             elif user_step in (26, 119):
 
-                price1 = db.get_prepare_new_user_price(user_id)
+                price1 = db.get_prepare_new_user_price(user_id)[0]
                 if user_step == 26:
                     ans, error_text = is_suitable_price_2_fl(message.text, float(price1))
                 else:
@@ -2002,7 +2139,7 @@ def handle_admin_command(command: str, chat_id: str or int,
         pass
 
 
-def set_code(user_id,code,chat_id):
+def set_code(user_id, code, chat_id):
     print(code)
     db.set_referral_code(code, user_id)
     mes.text_message(chat_id,

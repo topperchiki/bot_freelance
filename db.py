@@ -220,7 +220,7 @@ def delete_user_posts(user_id: str or int):
 
 @d_db_all_exist
 def get_user_posts(user_id: str or int):
-    return "SELECT user_posts_count FROM users WHERE user_id = %s", \
+    return "SELECT post_id FROM posts WHERE owner_id = %s", \
            (str(user_id),)
 
 
@@ -520,8 +520,6 @@ def get_hashtags_categories_with_ids(categories_ids: tuple or list):
               "id IN ( " + "%s, " * len(categories_ids)
     command = command[:-2]
     pack = list([str(i) for i in categories_ids])
-    if len(pack) == 1:
-        pack.append("")
     return command + ")", pack
 
 
@@ -542,18 +540,18 @@ def set_prepare_new_user_categories(user_id: str or int,
 def set_prepare_payment_info(user_id: str or int, pay_type: str or int, price: str or int):
     return "UPDATE post_prepare SET pay_type = %s, price = %s " \
            "WHERE user_id = %s", \
-           (str(user_id), str(pay_type), str(price))
+           (str(pay_type), str(price), str(user_id))
 
 
 @d_db_empty
 def set_prepare_new_user_price(user_id: str or int, price: str or int):
-    return "UPDATE post_prepare SET new_price = %s WHERE user_id = %s", \
-           (str(user_id), )
+    return "UPDATE post_prepare SET new_prices = %s WHERE user_id = %s", \
+           (str(price), str(user_id))
 
 
 @d_db_one
 def get_prepare_new_user_price(user_id: str or int):
-    return "SELECT new_price FROM post_prepare WHERE user_id = %s", \
+    return "SELECT new_prices FROM post_prepare WHERE user_id = %s", \
            (str(user_id), )
 
 
@@ -614,13 +612,13 @@ def add_post(post_id: str or int, user_id: str or int,
     return "INSERT INTO posts(post_id, owner_id, creation_date, last_up, " \
            "type, title, description, memo, portfolio, contacts, categories, " \
            "price, pay_type, guarantee) " \
-           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",\
+           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",\
            (str(post_id), str(user_id), str(creation_date), str(last_up),
             str(post_type), title, description, memo, portfolio, contacts, categories,
-            price, pay_type, str(guarantee))
+            price, str(pay_type), str(guarantee))
 
 
-@d_db_one
+@d_db_exist
 def is_post_id_exist(post_id: int or str):
     return "SELECT post_id FROM posts WHERE post_id = %s", (str(post_id), )
 
@@ -631,9 +629,15 @@ def get_post_owner_id(post_id: str or int):
 
 
 @d_db_one
-def get_post_all(user_id: str or int):
+def get_post_all(post_id: str or int):
     return "SELECT type, title, description, memo, portfolio, contacts, " \
            "categories, price, pay_type, guarantee, creation_date, last_up, " \
            "auto_ups, auto_ups_used, owner_id " \
-           "FROM post_prepare WHERE user_id = %s", \
-           (str(user_id),)
+           "FROM posts WHERE post_id = %s", \
+           (str(post_id),)
+
+
+@d_db_one
+def get_prepare_payment_info(user_id: str or int):
+    return "SELECT pay_type, price FROM post_prepare WHERE user_id = %s", \
+           (str(user_id), )
