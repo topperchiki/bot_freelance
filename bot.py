@@ -499,7 +499,7 @@ def query_handler(call):
                 tb.edit_message_reply_markup(chat_id=chat_id,
                                              message_id=message_id,
                                              reply_markup=keyboard)
-                mes.send_post(chat_id, new_post_id)
+                mes.send_post(ID_POST_CHANNEL, new_post_id)
                 return
 
             elif call_data_lowered[:8] == "edit_pbp":
