@@ -1104,9 +1104,9 @@ def send_post(chat_id: str or int, post_id: str or int):
 
     text = ""
     if post[0] == 1:
-        text += "#Исполнитель\n\n"
+        text += "#Исполнитель"
     else:
-        text += "#Заказчик\n\n"
+        text += "#Заказчик"
 
     text += "\n\n"
     text += "<b>Название:</b> " + post[1] + "\n"
