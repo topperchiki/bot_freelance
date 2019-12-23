@@ -1143,7 +1143,7 @@ def send_post(chat_id: str or int, post_id: str or int):
                                                 url=post[4]))
 
     keyboard.add(types.InlineKeyboardButton(text="Пожаловаться",
-                                            callback_data="report:" + post_id))
+                                            callback_data="report:" + str(post_id)))
     return tb.send_message(chat_id=chat_id, text=text, reply_markup=keyboard,
                            parse_mode="html")
 
