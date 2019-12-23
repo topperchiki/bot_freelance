@@ -290,7 +290,6 @@ def edit_pbp_payment_type_building(post_type=1):
     return text, keyboard
 
 
-<<<<<<< HEAD
 def get_post_building(post_id: str or int):
     post_id = str(post_id)
 
