@@ -1130,7 +1130,7 @@ def send_post(chat_id: str or int, post_id: str or int):
     hashtags = db.get_hashtags_categories_with_ids(categories)
     d = dict()
     for i in hashtags:
-        d[hashtags[0]] = hashtags[1]
+        d[i[0]] = i[1]
 
     for cat in categories:
         text += d[cat] + ", "
@@ -1195,5 +1195,4 @@ def send_prepared_post(chat_id: str or int, message_id: str or int,
     else:
         tb.edit_message_text(chat_id=chat_id, text=text, message_id=message_id,
                              reply_markup=keyboard)
-=======
->>>>>>> 7e3dc1365c603008abc7338c70c556f7ae2ed4d0
+
