@@ -29,6 +29,10 @@ def start_menu(message: telebot.types.Message):
     #  set_user_referral_code(user_id, author_user_id) - Поставить для пользователя user_id реферальный код пользователя author_user_id
 
     if len(user_step) == 0:
+
+        adding_new_user(user_id)
+        user_step = 0
+
         if len(message.text) > 7:
             ref_code = message.text[8:]
             try:
@@ -44,8 +48,6 @@ def start_menu(message: telebot.types.Message):
             except Exception:
                 tb.send_message(chat_id, 'Неверный код')
 
-        adding_new_user(user_id)
-        user_step = 0
 
     else:
         user_step = user_step[0]
