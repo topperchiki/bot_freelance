@@ -2224,8 +2224,10 @@ def take_mes(message):
     a = message.text
     return a
 
+
 #
 if __name__ == "__main__":
     Thread(target=auto_actions).start()
 
     tb.polling(none_stop=True)
+
