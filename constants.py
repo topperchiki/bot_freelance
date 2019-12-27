@@ -6,7 +6,6 @@ ID_POST_CHANNEL = -243828263
 USERNAME_POST_CHANNEL = ""
 ID_MANAGE_CHANNEL = -243828263
 ALLOWED_GROUP_CHATS = {ID_POST_CHANNEL, ID_MANAGE_CHANNEL}
-ADMIN_IDS = {}
 
 # Payment
 PAYMENT_PROVIDER = '410694247:TEST:1496cc79-d856-44c4-9aa0-0271d717ca9f'
@@ -43,10 +42,30 @@ T_HELP = "Этот бот для канала " + ("@" + USERNAME_POST_CHANNEL i
            "1 раза в 3 часа) или автоматические подъемы (актуальную информацию о покупке смотреть в меню покупки\n" \
            "Чтобы купить подъемы, перейдите в списку объявлений, выберите нужно объявление и нажмите \"Купить " \
            "подъемы\". Следуйте инструкциям"
+T_HELP_ADMIN = ""
+T_COMMANDS_LIST_D = {"/add_admin_АйдиЮзера": "назначение на роль администратора бота",
+                        "/del_admin_АйдиЮзера": "снятие роли администратора бота",
+                        "/unverify": "",
+                        "/verify": "",
+                        "/user_info": "",
+                        "/ban_user": "",
+                        "/delete_user": "",
+                        "/user_posts": "",
+                        "/hide_rate": "",
+                        "/delete_rate": "",
+                        "/create_rate": "",
+                        "/show_rate": "",
+                        "/set_referral_code": "",
+                        "/list_posts": "",
+                        "/delete_post": "",
+                        "/post_info": "",
+                        "/clear_cache": ""
+                        }
 
 # NOT TO EDIT
 URL_CONTACT_ACC = "https://t.me/" + CONTACT_ACC_USERNAME
 CANT_READ_FILE_EXCEPTIONS = FileNotFoundError, FileExistsError, NotADirectoryError
+T_COMMANDS_LIST = ""  #  SCROLL BELOW TO GENERATORS
 POSSIBLE_COME_TO_SIDEMENU = {1, 4, 100}
 POSSIBLE_COME_TO_PAIDSERVICES = {1, 75}
 POSSIBLE_COME_TO_CREATEFREELANCEPOST = {2, 4}
@@ -79,8 +98,8 @@ POSSIBLE_COME_TO_EDIT_PBP_DESCRIPTION_FR = {31}
 POSSIBLE_COME_TO_EDIT_PBP_DESCRIPTION_CU = {124}
 POSSIBLE_COME_TO_EDIT_PBP_MEMO = {31}
 POSSIBLE_COME_TO_EDIT_PBP_NO_PORTFOLIO_FR = {30, 20}
-POSSIBLE_COME_TO_EDIT_PBP_PORTFOLIO_FR = {31}
-POSSIBLE_COME_TO_EDIT_PBP_PORTFOLIO_CU = {124}
+POSSIBLE_COME_TO_EDIT_PBP_PORTFOLIO_FR = {31, 20}
+POSSIBLE_COME_TO_EDIT_PBP_PORTFOLIO_CU = {124, 113}
 POSSIBLE_COME_TO_EDIT_CONTACTS_FR = {31}
 POSSIBLE_COME_TO_EDIT_CONTACTS_CU = {124}
 POSSIBLE_COME_TO_EDIT_PBP_PAYMENT_FR = {31, 23, 27, 28}
@@ -93,3 +112,8 @@ POSSIBLE_COME_TO_EDIT_PBP_PRICE_2_FR = {23}
 POSSIBLE_COME_TO_EDIT_PBP_PRICE_2_CU = {116}
 POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_FR = {31, 30, 25}
 POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_CU = {124, 123, 118}
+
+# GENERTATORS
+for i in T_COMMANDS_LIST.items():
+  T_COMMANDS_LIST += i[0] + " - " + i[1] + "\n"
+T_COMMANDS_LIST = T_COMMANDS_LIST[:-1]

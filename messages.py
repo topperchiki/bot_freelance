@@ -8,7 +8,7 @@ import time
 
 # Building
 def main_menu_building(user_id: str or int):
-    count = len(db.get_count_user_posts(user_id))
+    count = db.get_user_posts_count(user_id)[0]
 
     text = "Главное меню"
 
@@ -40,13 +40,12 @@ def paid_service_menu_building(user_id: str or int):
 
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     a = types.InlineKeyboardButton(text="Реклама на канале", url=URL_CONTACT_ACC)
-    b = None
-    if db.get_user_verification_status(user_id):
-        b = types.InlineKeyboardButton(text="Верифицирован ✅", callback_data="noanswer")
+    if db.get_user_verification_status(user_id)[0]:
+        b = types.InlineKeyboardButton(text="Верифицирован ✅", callback_data="verification_ticket")
     else:
         b = types.InlineKeyboardButton(text="Верификация аккаунта", callback_data="verification")
-    c = types.InlineKeyboardButton(text="Назад", callback_data="mainMenu")
 
+    c = types.InlineKeyboardButton(text="Назад", callback_data="mainMenu")
     keyboard.add(a, b, c)
 
     return text, keyboard
@@ -175,7 +174,7 @@ def edit_pbp_menu_building(post_type: int):
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     if post_type == 1:
         keyboard.add(types.InlineKeyboardButton(text="Категории",
-                                                callback_data="edit_pbp_categories_fr_n_1"),
+                                                callback_data="edit_pbp_categories_fr_n_0"),
                      types.InlineKeyboardButton(text="Название",
                                                 callback_data="edit_pbp_title_fr"))
         keyboard.add(types.InlineKeyboardButton(text="Описание",
@@ -194,7 +193,7 @@ def edit_pbp_menu_building(post_type: int):
                                                 callback_data="preview_post_fr_bm"))  # back menu
     elif post_type == 2:
         keyboard.add(types.InlineKeyboardButton(text="Категории",
-                                                callback_data="edit_pbp_categories_cu_n_1"),
+                                                callback_data="edit_pbp_categories_cu_n_0"),
                      types.InlineKeyboardButton(text="Название",
                                                 callback_data="edit_pbp_title_cu"))
         keyboard.add(types.InlineKeyboardButton(text="Описание",
@@ -393,7 +392,7 @@ def send_prepared_post_building(user_id: str or int,
         minimum_price, maximum_price = post_info[8].split(";")
         text += "\nЦена: " + minimum_price + " - " + maximum_price + " $"
 
-    text+= "\nКатегории: "
+    text += "\nКатегории: "
     categories = [int(i) for i in post_info[3].split(";")]
     categories_hashtags = db.get_hashtags_categories_with_ids(categories)
     d_cat = dict()
@@ -945,12 +944,9 @@ def edit_pbp_categories(chat_id: str or int, message_id: str or int,
 
     if str(category_to_show) == "0":
         keyboard.add(types.InlineKeyboardButton("Назад",
-                                                callback_data="edit_pbp_menu_" + "fr" if not customer else "cu"))
+                                                callback_data="edit_pbp_menu_" + ("fr" if not customer else "cu")))
     else:
-        keyboard.add(types.InlineKeyboardButton("Назад",
-                                                callback_data=text_pattern2 + str(
-                                                    db.get_category_parent(
-                                                        category_to_show)[0])))
+        keyboard.add(types.InlineKeyboardButton("Назад", callback_data=text_pattern2))
     text = "Выберите категорию"
     tb.edit_message_text(text=text, chat_id=chat_id, message_id=message_id,
                          reply_markup=keyboard)

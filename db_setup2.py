@@ -108,7 +108,8 @@ def create_users_table(connection: psycopg2.extensions.connection):
                                 date_added INT NOT NULL,
 
                                 step INT NOT NULL DEFAULT 0,
-                                user_posts_count INT NOT NULL DEFAULT 0,
+                                admin BOOLEAN NOT NULL DEFAULT FALSE,
+                                posts_count INT NOT NULL DEFAULT 0,
                                 manual_ups INT NOT NULL DEFAULT 0,
                                 spent_money INT NOT NULL DEFAULT 0,
                                 verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -118,6 +119,13 @@ def create_users_table(connection: psycopg2.extensions.connection):
                                 notified_ban BOOLEAN NOT NULL DEFAULT FALSE
                                 )''')
     cursor.close()
+
+
+def run_command(connection: psycopg2.extensions.connection, command):
+    cursor = connection.cursor()
+    cursor.execute(command)
+    cursor.close()
+    connection.commit()
 
 
 def main_setup(db_name, db_user, db_pass, db_host="localhost"):
@@ -135,6 +143,10 @@ def main_setup(db_name, db_user, db_pass, db_host="localhost"):
         create_categories_table(conn)
         create_post_prepare_table(conn)
         conn.commit()
+        run_command(conn, "ALTER TABLE \"post_prepare\" "
+                          "ALTER COLUMN \"categories\" SET DEFAULT '';")
+        run_command(conn, "ALTER TABLE \"post_prepare\" "
+                          "ALTER COLUMN \"new_categories\" SET DEFAULT '';")
         conn.close()
         print("Success")
 
@@ -155,10 +167,6 @@ def main_setup(db_name, db_user, db_pass, db_host="localhost"):
 
             for category in d2.items():
                 db.set_category_parent(category[0], category[1]["parent"])
-            print("Enter this command: ALTER TABLE \"post_prepare\" "
-                  "ALTER COLUMN \"categories\" SET DEFAULT '';")
-            print("Enter this command: ALTER TABLE \"post_prepare\" "
-                  "ALTER COLUMN \"new_categories\" SET DEFAULT '';")
 
 
 if __name__ == "__main__":

@@ -334,6 +334,13 @@ def get_info_about_user_ban(user_id: str or int):
            (str(user_id),)
 
 
+@d_db_exist
+def get_user_step_ban_status_is_admin(user_id: str or int):
+    return 'SELECT step, banned, notified_ban, admin FROM users ' \
+           'WHERE user_id = %s', \
+           (str(user_id), )
+
+
 @d_db_empty
 def set_user_notified_ban(user_id: str or int, status: bool):
     return 'UPDATE users SET notified_ban = %s WHERE user_id = %s', \
@@ -362,6 +369,12 @@ def get_categories_ids_names_with_parent(parent_id: str or int):
 
 @d_db_one
 def get_category_parent(category_id: str or int):
+    return 'SELECT category_parent FROM categories WHERE category_id = %s', \
+           (str(category_id),)
+
+
+@d_db_exist
+def get_category_parent_if_exists(category_id: str or int):
     return 'SELECT category_parent FROM categories WHERE category_id = %s', \
            (str(category_id),)
 
@@ -628,6 +641,11 @@ def get_post_owner_id(post_id: str or int):
     return "SELECT owner_id FROM posts WHERE post_id = %s", (str(post_id), )
 
 
+@d_db_exist
+def get_post_owner_id_if_exists(post_id: str or int):
+    return "SELECT owner_id FROM posts WHERE post_id = %s", (str(post_id), )
+
+
 @d_db_one
 def get_post_all(post_id: str or int):
     return "SELECT type, title, description, memo, portfolio, contacts, " \
@@ -641,3 +659,24 @@ def get_post_all(post_id: str or int):
 def get_prepare_payment_info(user_id: str or int):
     return "SELECT pay_type, price FROM post_prepare WHERE user_id = %s", \
            (str(user_id), )
+
+
+@d_db_one
+def get_user_posts_count(user_id: str or int):
+    return 'SELECT posts_count FROM users WHERE user_id = %s', (str(user_id),)
+
+
+@d_db_empty
+def set_user_posts_count(user_id: str or int, value: int or str):
+    return 'UPDATE users SET posts_count = %s WHERE user_id = %s', (str(value), str(user_id))
+
+
+@d_db_empty
+def set_admin_status(user_id: str or int, value: bool):
+    return 'UPDATE users SET admin = %s WHERE user_id = %s', (str(value), str(user_id))
+
+
+@d_db_exist
+def get_admin_status_if_exists(user_id: str or int):
+    return 'SELECT admin FROM users WHERE user_id = %s', (str(user_id), )
+
