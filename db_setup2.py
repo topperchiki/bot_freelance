@@ -3,6 +3,26 @@ import db
 import json
 
 
+def create_verification_tickets_table(connection: psycopg2.extensions.connection):
+    cursor = connection.cursor()
+    cursor.execute('''CREATE TABLE vtickets(
+                                user_id INT NOT NULL,
+                                status INT DEFAULT 1, 
+                                text TEXT,
+                                contacts TEXT
+                                )''')
+    cursor.close()
+
+# 0 0 0 0 0 0
+# 1 - Filled text
+# 2 - Filled contacts
+# 3 - Paid
+# 4 - Sent
+# 5 - Checked by admins
+# 6 - Approved or no
+# 7 - Verified by admin
+
+
 def create_auto_actions_table(connection: psycopg2.extensions.connection):
     cursor = connection.cursor()
     cursor.execute('''CREATE TABLE auto_actions(
@@ -116,7 +136,9 @@ def create_users_table(connection: psycopg2.extensions.connection):
                                 referral_id INT,
                                 referral_author INT,
                                 banned BOOLEAN NOT NULL DEFAULT FALSE,
-                                notified_ban BOOLEAN NOT NULL DEFAULT FALSE
+                                notified_ban BOOLEAN NOT NULL DEFAULT FALSE,
+                                chose_rate INT,
+                                post_to INT
                                 )''')
     cursor.close()
 
@@ -142,6 +164,7 @@ def main_setup(db_name, db_user, db_pass, db_host="localhost"):
         create_auto_actions_table(conn)
         create_categories_table(conn)
         create_post_prepare_table(conn)
+        create_verification_tickets_table(conn)
         conn.commit()
         run_command(conn, "ALTER TABLE \"post_prepare\" "
                           "ALTER COLUMN \"categories\" SET DEFAULT '';")

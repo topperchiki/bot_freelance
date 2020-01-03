@@ -42,9 +42,19 @@ T_HELP = "Этот бот для канала " + ("@" + USERNAME_POST_CHANNEL i
            "1 раза в 3 часа) или автоматические подъемы (актуальную информацию о покупке смотреть в меню покупки\n" \
            "Чтобы купить подъемы, перейдите в списку объявлений, выберите нужно объявление и нажмите \"Купить " \
            "подъемы\". Следуйте инструкциям"
-T_HELP_ADMIN = ""
-T_COMMANDS_LIST_D = {"/add_admin_АйдиЮзера": "назначение на роль администратора бота",
-                        "/del_admin_АйдиЮзера": "снятие роли администратора бота",
+T_HELP_ADMIN = T_HELP + "\n\nЭто было описание, которое видят все пользователи при вводе команды." \
+                        "\n\nЧтобы увидеть все команды доступные администратору бота, " \
+                        "введите /commands\n\nВсе команды с аргументами можно вводить с разными " \
+                        "разделителями. Главное, чтобы перед аргументы был какой-нибудь символ. " \
+                        "Например, обе команды \"/add_admin 1\" и \"/add_admin_1\" будут работать. " \
+                        "\nuserId - id пользователя в telegram"
+T_HELP_VERIFICATION_EDIT = "Чтобы отредактировать заявку, выберите нужное " \
+                           "поле (описание, контакты) " \
+                           "и нажмите кнопку \"Редактировать\".  " \
+                           "Если вы уже отправили заявку, от сперва нужно " \
+                           "отменить её (оплата сохранится)"
+T_COMMANDS_LIST_D = {"/add_admin": "назначение на роль администратора бота",
+                        "/del_admin": "снятие роли администратора бота",
                         "/unverify": "",
                         "/verify": "",
                         "/user_info": "",
@@ -67,7 +77,7 @@ URL_CONTACT_ACC = "https://t.me/" + CONTACT_ACC_USERNAME
 CANT_READ_FILE_EXCEPTIONS = FileNotFoundError, FileExistsError, NotADirectoryError
 T_COMMANDS_LIST = ""  #  SCROLL BELOW TO GENERATORS
 POSSIBLE_COME_TO_SIDEMENU = {1, 4, 100}
-POSSIBLE_COME_TO_PAIDSERVICES = {1, 75}
+POSSIBLE_COME_TO_PAIDSERVICES = {1, 2, 75}
 POSSIBLE_COME_TO_CREATEFREELANCEPOST = {2, 4}
 POSSIBLE_COME_TO_CATEGORY_FR = {4, 5}
 POSSIBLE_COME_TO_CATEGORY_BACK_FR = {4}
@@ -112,8 +122,13 @@ POSSIBLE_COME_TO_EDIT_PBP_PRICE_2_FR = {23}
 POSSIBLE_COME_TO_EDIT_PBP_PRICE_2_CU = {116}
 POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_FR = {31, 30, 25}
 POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_CU = {124, 123, 118}
+POSSIBLE_COME_TO_VERIFICATION_TICKET = {1, 2, 151, 152, 153}
+POSSIBLE_COME_TO_BUYING_UPS_MENU = {160, 69, 1, 161, 163}
+POSSIBLE_COME_TO_BUYING_AUTO_UPS = {160, 163}
+POSSIBLE_COME_TO_BUYING_MANUAL_UPS = {160, 164}
+POSSIBLE_COME_TO_RATES_UPS_MENU = {162, 165}
 
 # GENERTATORS
-for i in T_COMMANDS_LIST.items():
+for i in T_COMMANDS_LIST_D.items():
   T_COMMANDS_LIST += i[0] + " - " + i[1] + "\n"
 T_COMMANDS_LIST = T_COMMANDS_LIST[:-1]

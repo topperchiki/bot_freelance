@@ -209,7 +209,7 @@ def set_user_ban_status(user_id: str or int, value: bool):
 @d_db_empty
 def set_verification_status(user_id: str or int, value: bool):
     return "UPDATE users SET verified = %s WHERE user_id = %s", \
-           str(value), str(user_id)
+           (str(value), str(user_id))
 
 
 @d_db_empty
@@ -219,14 +219,20 @@ def delete_user_posts(user_id: str or int):
 
 
 @d_db_all_exist
-def get_user_posts(user_id: str or int):
-    return "SELECT post_id FROM posts WHERE owner_id = %s", \
+def get_user_posts(user_id: str or int, start: int = 0, limit: int = 0):
+    req = "SELECT post_id FROM posts WHERE owner_id = %s"
+    if limit:
+        req += "LIMIT " + str(limit)
+    if start != 0:
+        req += "OFFSET " + str(start)
+
+    return req, (str(user_id),)
+
+
+@d_db_one
+def get_user_posts_count(user_id: str or int):
+    return "SELECT posts_count FROM users WHERE user_id = %s", \
            (str(user_id),)
-
-
-@d_db_exist
-def get_user_steps_if_exists(user_id: str or int):
-    return "SELECT step FROM users WHERE user_id = %s", (str(user_id),)
 
 
 @d_db_empty
@@ -663,20 +669,109 @@ def get_prepare_payment_info(user_id: str or int):
 
 @d_db_one
 def get_user_posts_count(user_id: str or int):
-    return 'SELECT posts_count FROM users WHERE user_id = %s', (str(user_id),)
+    return 'SELECT posts_count FROM users WHERE user_id = %s', \
+           (str(user_id),)
 
 
 @d_db_empty
 def set_user_posts_count(user_id: str or int, value: int or str):
-    return 'UPDATE users SET posts_count = %s WHERE user_id = %s', (str(value), str(user_id))
+    return 'UPDATE users SET posts_count = %s WHERE user_id = %s', \
+           (str(value), str(user_id))
 
 
 @d_db_empty
 def set_admin_status(user_id: str or int, value: bool):
-    return 'UPDATE users SET admin = %s WHERE user_id = %s', (str(value), str(user_id))
+    return 'UPDATE users SET admin = %s WHERE user_id = %s', \
+           (str(value), str(user_id))
 
 
 @d_db_exist
 def get_admin_status_if_exists(user_id: str or int):
     return 'SELECT admin FROM users WHERE user_id = %s', (str(user_id), )
 
+
+@d_db_one
+def get_verification_ticket_text_and_status(user_id: str or int):
+    return 'SELECT text, status FROM vtickets WHERE user_id = %s', \
+           (str(user_id), )
+
+
+@d_db_one
+def get_verification_ticket_contacts_and_status(user_id: str or int):
+    return 'SELECT contacts, status FROM vtickets WHERE user_id = %s', \
+           (str(user_id), )
+
+
+@d_db_one
+def get_verification_ticket_status(user_id: str or int):
+    return 'SELECT status FROM vtickets WHERE user_id = %s', (str(user_id),)
+
+
+@d_db_empty
+def set_verification_ticket(user_id: str or int, text: str,
+                            contacts: str, status: int or str):
+    return 'UPDATE vtickets SET text = %s, contacts = %s, ' \
+           'status = %s WHERE user_id = %s', \
+           (text, contacts, str(status), str(user_id))
+
+
+@d_db_empty
+def set_verification_ticket_status(user_id: str or int, status: int or str):
+    return 'UPDATE vtickets SET status = %s WHERE user_id = %s', \
+           (str(status), str(user_id))
+
+
+@d_db_one
+def get_verification_ticket_text_and_contacts(user_id: str or int):
+    return 'SELECT text, contacts FROM vtickets WHERE user_id = %s', (str(user_id), )
+
+
+@d_db_empty
+def add_row_to_vtickets(user_id: str or int):
+    return 'INSERT INTO vtickets(user_id, text, contacts, status) ' \
+           'VALUES (%s, \'\', \'\', 0)', \
+           (str(user_id), )
+
+
+@d_db_empty
+def set_verification_text(user_id: str or int, text: str):
+    return 'UPDATE vtickets SET text = %s WHERE user_id = %s', \
+           (str(text), str(user_id))
+
+
+@d_db_empty
+def set_verification_contacts(user_id: str or int, contacts: str):
+    return 'UPDATE vtickets SET contacts = %s WHERE user_id = %s', \
+           (str(contacts), str(user_id))
+
+
+@d_db_all_exist
+def get_showed_rates():
+    return 'SELECT rate_id, update_time, price FROM rates ' \
+           'WHERE showed = True', \
+           None
+
+
+@d_db_exist
+def get_rate_time_and_price_if_exist(rate_id: str or int):
+    return 'SELECT update_time, price FROM rates WHERE rate_id = %s', \
+           (str(rate_id), )
+
+
+@d_db_exist
+def get_rate_price_if_exist(rate_id: str or int):
+    return 'SELECT price FROM rates WHERE rate_id = %s', \
+           (str(rate_id), )
+
+
+@d_db_empty
+def set_user_chose_rate_and_post_to(user_id: str or int,
+                                    rate_id: str or int, post_id: str or int):
+    return 'UPDATE users SET chose_rate = %s, post_to = %s WHERE user_id = %s', \
+           (str(rate_id), str(post_id), str(user_id))
+
+
+@d_db_one
+def get_user_chose_rate_and_post_to(user_id: str or int):
+    return 'SELECT chose_rate, post_to FROM users WHERE user_id = %s', \
+           (str(user_id), )

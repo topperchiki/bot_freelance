@@ -41,9 +41,9 @@ def paid_service_menu_building(user_id: str or int):
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     a = types.InlineKeyboardButton(text="Реклама на канале", url=URL_CONTACT_ACC)
     if db.get_user_verification_status(user_id)[0]:
-        b = types.InlineKeyboardButton(text="Верифицирован ✅", callback_data="verification_ticket")
+        b = types.InlineKeyboardButton(text="Верифицирован ✅", callback_data="verification_1")
     else:
-        b = types.InlineKeyboardButton(text="Верификация аккаунта", callback_data="verification")
+        b = types.InlineKeyboardButton(text="Верификация аккаунта", callback_data="verification_1")
 
     c = types.InlineKeyboardButton(text="Назад", callback_data="mainMenu")
     keyboard.add(a, b, c)
@@ -93,9 +93,10 @@ def gen_keyboard_listing(now: int, num_all_pages: int):
 
 
 def nice_time(time_value: int):
-    minutes = time_value % 3600
-    hours = time_value % 216000
-    days = time_value % 12960000
+    seconds = time_value % 60
+    minutes = time_value // 60
+    hours = time_value // 3600
+    days = time_value // 86400
 
     text = ""
     if days:
@@ -110,13 +111,23 @@ def nice_time(time_value: int):
             text += " " + str(minutes) + " мин."
         else:
             text += str(minutes) + " мин."
+    if seconds:
+        if text:
+            text += " " + str(seconds) + " сек."
+        else:
+            text += str(seconds) + " сек."
     return text
 
 
-def get_posts_on_page(chat_id: str or int, user_id: str or int, page: int):
-    posts = db.get_user_posts(user_id)
+def get_posts_on_page(user_id: str or int, page: int):
+    posts = db.get_user_posts(user_id, (page - 1) * 10, 10)
     if len(posts) == 0:
-        text = "Нет опубликованных объявлений"
+        if page == 1:
+            text = "Нет опубликованных объявлений"
+        else:
+            text = "На этой странице нет объявлений"
+        text += "\n\n----------\nОсталось ручных подъемов ☆ - " + str(
+            db.get_user_manual_ups(user_id)[0])
         keyboard = types.InlineKeyboardMarkup(row_width=1)
         keyboard.add(types.InlineKeyboardButton(text="В главное меню", callback_data="mainmenu"))
         return text, keyboard
@@ -154,7 +165,7 @@ def get_posts_on_page(chat_id: str or int, user_id: str or int, page: int):
         else:
             text += "АвтоПодъемы: ❌\n\n"
 
-    text += "----------\nОсталось ручных апов ☆ - " + str(db.get_user_manual_ups(user_id))
+    text += "----------\nОсталось ручных подъемов ☆ - " + str(db.get_user_manual_ups(user_id)[0])
     data = gen_keyboard_listing(page, all_pages)
     keyboard = types.InlineKeyboardMarkup(row_width=len(data) + 1)
     buttons = []
@@ -165,8 +176,8 @@ def get_posts_on_page(chat_id: str or int, user_id: str or int, page: int):
     return text, keyboard
 
 
-def generate_help():
-    return T_HELP
+def generate_help(admin=False):
+    return (T_HELP if not admin else T_HELP_ADMIN)
 
 
 def edit_pbp_menu_building(post_type: int):
@@ -352,7 +363,7 @@ def get_post_building(post_id: str or int):
                                             #callback_data="edit:" + post_id))
     manual_ups = db.get_user_manual_ups(post[14])
     keyboard.add(types.InlineKeyboardButton(text="Поднять (" + str(manual_ups[0]) + ")", callback_data="noanswer")) #callback_data="up:" + post_id))
-    keyboard.add(types.InlineKeyboardButton(text="Купить подъемы", callback_data="noanswer")) #callback_data="buyingUpsMenu:" + post_id))
+    keyboard.add(types.InlineKeyboardButton(text="Купить подъемы", callback_data="buying_Ups_Menu:" + post_id)) #callback_data="buyingUpsMenu:" + post_id))
     return text, keyboard
 
 
@@ -419,6 +430,117 @@ def send_prepared_post_building(user_id: str or int,
         return text, False
 
 
+def send_verification_ticket_building(user_id: str or int, page: int = 1):
+    if page == 1:
+        text, status = db.get_verification_ticket_text_and_status(user_id)
+    else:
+        text, status = db.get_verification_ticket_contacts_and_status(user_id)
+
+    if (status >> 7 & 1):
+        return verified_by_admin_building()
+
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    if not (status >> 4 & 1):
+
+        if len(text) == 0:
+            text = "Пусто"
+
+        if page == 1:
+            keyboard.add(types.InlineKeyboardButton(text="Редактировать",
+                                                    callback_data="verification_edit_1"))
+        else:
+            keyboard.add(types.InlineKeyboardButton(text="Редактировать",
+                                                    callback_data="verification_edit_2"))
+
+        if page == 1:
+            keyboard.add(types.InlineKeyboardButton(text="•Описание•",
+                                                    callback_data="noanswer"),
+                         types.InlineKeyboardButton(text="Контакты",
+                                                    callback_data="verification_2"))
+        elif page == 2:
+            keyboard.add(types.InlineKeyboardButton(text="Описание",
+                                                    callback_data="verification_1"),
+                         types.InlineKeyboardButton(text="•Контакты•",
+                                                    callback_data="noanswer"))
+
+        if not (status >> 3 & 1):
+            keyboard.add(types.InlineKeyboardButton(text="Оплатить (500 р.)",
+                                                    callback_data="verification_pay"))
+        else:
+            keyboard.add(types.InlineKeyboardButton(text="Оплачено",
+                                                    callback_data="noanswer"))
+
+            filled = ((status >> 1) & 1) + ((status >> 2) & 1)
+            if filled == 2:
+                keyboard.add(types.InlineKeyboardButton(text="Отправить на рассмотрение",
+                                                        callback_data="verification_send"))
+            elif filled == 1:
+                keyboard.add(
+                    types.InlineKeyboardButton(text="Заявка заполнена (1/2)",
+                                               callback_data="noanswer"))
+            elif filled == 0:
+                keyboard.add(
+                    types.InlineKeyboardButton(text="Заявка заполнена (0/2)",
+                                               callback_data="noanswer"))
+
+    else:
+
+        if page == 1:
+            keyboard.add(types.InlineKeyboardButton(text="•Описание•",
+                                                    callback_data="noanswer"),
+                         types.InlineKeyboardButton(text="Контакты",
+                                                    callback_data="verification_2"))
+        elif page == 2:
+            keyboard.add(types.InlineKeyboardButton(text="Описание",
+                                                    callback_data="verification_1"),
+                         types.InlineKeyboardButton(text="•Контакты•",
+                                                    callback_data="noanswer"))
+
+        keyboard.add(types.InlineKeyboardButton(text="Заявка отправлена", callback_data="noanswer"))
+        if not (status >> 5 & 1):
+            keyboard.add(
+                types.InlineKeyboardButton(text="На рассмотрении ⌚",
+                                           callback_data="noanswer"))
+            keyboard.add(
+                types.InlineKeyboardButton(text="Отменить отправку",
+                                           callback_data="verification_cancel"))
+        else:
+            if (status >> 6) & 1:
+                keyboard.add(
+                    types.InlineKeyboardButton(text="Подтверждена ✅",
+                                               callback_data="noanswer"))
+            else:
+                keyboard.add(
+                    types.InlineKeyboardButton(text="Отказано ❌",
+                                               callback_data="noanswer"))
+                keyboard.add(
+                    types.InlineKeyboardButton(text="Новая заявка",
+                                               callback_data="verification_new_ticket"))
+
+    keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="paidservices"))
+    return text, keyboard
+
+
+def buying_ups_menu_building(post_id: str or int):
+    post_id = str(post_id)
+    text = "Выберите тип"
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(text="Ручные",
+                                            callback_data="buying_ups_manual"))
+    keyboard.add(types.InlineKeyboardButton(text="Автоматические",
+                                            callback_data="buying_ups_auto_" + post_id))
+    return text, keyboard
+
+
+def verified_by_admin_building():
+    text = "Вы верифицированы администратором"
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                            callback_data="paidservices"))
+    return text, keyboard
+
+
 #
 def main_menu_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 1)
@@ -454,14 +576,16 @@ def text_message(chat_id: str or int, text: str):
 
 
 def send_posts_page(chat_id: str or int, message_id: str or int, user_id: str or int, page: int):
-    text, keyboard = get_posts_on_page(chat_id, user_id, page)
+    db.set_user_step(user_id, 1)
+    text, keyboard = get_posts_on_page(user_id, page)
     if text is None:
         return
     tb.edit_message_text(text=text, message_id=message_id, chat_id=chat_id, reply_markup=keyboard)
 
 
 def send_posts_page_nm(chat_id: str or int, user_id: str or int, page: int):
-    text, keyboard = get_posts_on_page(chat_id, user_id, page)
+    db.set_user_step(user_id, 1)
+    text, keyboard = get_posts_on_page(user_id, page)
     if text is None:
         return
     tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
@@ -475,8 +599,8 @@ def failed_showing_post(chat_id: str or int):
     tb.send_message(text="Произошла ошибка", chat_id=chat_id)
 
 
-def help_nm(chat_id: int or str):
-    text = generate_help()
+def help_nm(chat_id: int or str, admin=False):
+    text = generate_help(admin)
     tb.send_message(chat_id=chat_id, text=text)
 
 
@@ -495,12 +619,14 @@ def paid_service_menu_nm(chat_id: int or str, user_id: int or str):
     tb.send_message(chat_id=chat_id, text=text, reply_markup=mark_up)
 
 
-def paid_service_menu(chat_id: int or str, message_id: str or int, user_id: int or str):
+def paid_service_menu(chat_id: int or str,
+                      message_id: str or int, user_id: int or str):
     db.set_user_step(user_id, 1)
 
     text, mark_up = paid_service_menu_building(user_id)
 
-    tb.send_message(chat_id=chat_id, message_id=message_id, text=text, reply_markup=mark_up)
+    tb.edit_message_text(chat_id=chat_id, message_id=message_id,
+                         text=text, reply_markup=mark_up)
 
 
 def categories_post(chat_id: str or int, message_id: str or int, user_id: str or int, post_type=1):
@@ -1151,7 +1277,7 @@ def posted(chat_id: str or int, user_id: str or int, post_id: str or int):
     text = "Успешно опубликовано\nID вашего объявления " + post_id
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     keyboard.add(types.InlineKeyboardButton(text="Купить подъемы",
-                                            callback_data="buyingUpsMenu:" + post_id))
+                                            callback_data="buying_Ups_Menu:" + post_id))
     keyboard.add(types.InlineKeyboardButton(text="В главное меню",
                                             callback_data="mainMenu"))
     tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
@@ -1191,4 +1317,118 @@ def send_prepared_post(chat_id: str or int, message_id: str or int,
     else:
         tb.edit_message_text(chat_id=chat_id, text=text, message_id=message_id,
                              reply_markup=keyboard)
+
+
+def send_verification_ticket(chat_id: str or int, message_id: str or int,
+                             user_id: str or int, page=1):
+
+    db.set_user_step(user_id, 2)
+    text, keyboard = send_verification_ticket_building(user_id, page)
+    tb.edit_message_text(text=text, message_id=message_id,
+                         chat_id=chat_id, reply_markup=keyboard)
+
+
+def send_verification_ticket_nm(chat_id: str or int, user_id: str or int, page=1):
+
+    db.set_user_step(user_id, 2)
+    text, keyboard = send_verification_ticket_building(user_id, page)
+    tb.send_message(text=text, chat_id=chat_id, reply_markup=keyboard)
+
+
+def enter_verification_text_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 151)
+    text = "Ввведите текст"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def enter_verification_contacts_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 152)
+    text = "Ввведите контакты"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def send_approve_verification_ticket_nm(chat_id: str or int, user_id: str or int):
+    user_id = str(user_id)
+
+    text_t, contacts = db.get_verification_ticket_text_and_contacts(user_id)
+    text = "Заявка от пользователя " + user_id + "\n\n" + text_t + "\n\n" + contacts
+    text += "\n--------------\n/approve_v_" + user_id + "\n" + "/deny_v_" + user_id
+
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def pay_verification(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 153)
+
+    f = [types.LabeledPrice(label='Verification', amount=500 * 100)]
+    tb.send_invoice(chat_id, 'Подтверждение аккаунта', 'Верификация',
+                    '201', PAYMENT_PROVIDER, 'RUB', f, start_parameter='f')
+
+
+def buying_ups_menu(chat_id: str or int, message_id: str or int,
+                    user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 160)
+    text, keyboard = buying_ups_menu_building(post_id)
+    tb.edit_message_text(chat_id=chat_id, message_id=message_id,
+                         reply_markup=keyboard, text=text)
+
+
+def buying_ups_menu_nm(chat_id: str or int, user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 160)
+    text, keyboard = buying_ups_menu_building(post_id)
+    tb.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+
+
+def enter_manual_ups_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 161)
+    text = "Введите количество подъемов (от 1 до 100)"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def available_auto_rates(chat_id: str or int, message_id: str or int,
+                         user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 162)
+    rates = db.get_showed_rates()
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    if not len(rates):
+        text = "К сожалению, сейчас нет доступных вариантов автоматических подъемов"
+        keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="buying_ups_menu_" + str(user_id)))
+        tb.edit_message_text(text=text, chat_id=chat_id,
+                             message_id=message_id, reply_markup=keyboard)
+        return
+    text = "Выберите тариф"
+    post_id = str(post_id)
+    for rate in rates:
+        t = "1 раз в " + nice_time(rate[1]) + " (" + str(rate[2]) + "р.)"
+        keyboard.add(types.InlineKeyboardButton(text=t,
+                                                callback_data="buying_ups_rate_" + str(post_id) + " " + str(rate[0])))
+
+    tb.edit_message_text(text=text, reply_markup=keyboard,
+                         message_id=message_id, chat_id=chat_id)
+
+
+def enter_auto_ups(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 163)
+
+    text = "Введите количество подъемов (от 1 до 100)"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def send_invoice_manual_ups(chat_id: str or int, user_id: str or int,
+                            price: int, auto_ups: int):
+    return
+    # f = [types.LabeledPrice(label='Verification', amount=500 * 100)]
+    #     tb.send_invoice(message_id, 'Подтверждение аккаунта', 'Верификация',
+    #                     '126', PAYMENT_PROVIDER, 'RUB', f, start_parameter='f')
+
+
+def verification_paid(chat_id: str or int):
+    text = "Заявка на верификацию оплачена"
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def verified_by_admin(chat_id: str or int, message_id: str or int):
+    text, keyboard = verified_by_admin_building()
+    tb.edit_message_text(text=text, chat_id=chat_id,
+                         message_id=message_id, reply_markup=keyboard)
 

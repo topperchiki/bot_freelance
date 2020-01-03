@@ -29,6 +29,7 @@ def start_menu(message: telebot.types.Message):
     if len(user_info) == 0:
         adding_new_user(user_id)
         user_step = 0
+        user_info = (0, False, False, False)
 
         if len(message.text) > 7:
             ref_code = message.text[8:]
@@ -78,6 +79,7 @@ def help_and_tips(message: telebot.types.Message):
     if len(user_info) == 0:
         adding_new_user(user_id)
         user_step = 0
+        user_info = (0, False, False, False)
     else:
         user_step = user_info[0]
 
@@ -94,7 +96,7 @@ def help_and_tips(message: telebot.types.Message):
         if user_step == 29:
             mes.text_message(message, T_COMPLETE_EDITING)
             return
-        mes.help_nm(message.chat.id)
+        mes.help_nm(message.chat.id, user_info[3])
         return
 
 
@@ -108,17 +110,24 @@ def query_handler(call):
     user_id = call.from_user.id
     chat_id = call.message.chat.id
     message_id = call.message.message_id
-    user_info = db.get_user_steps_if_exists(user_id)
+    user_info = db.get_user_step_ban_status_is_admin(user_id)
 
     if len(user_info) == 0:
         adding_new_user(user_id)
         user_step = 0
+        user_info = (0, False, False, False)
     else:
         user_step = user_info[0]
 
     ban, status = user_info[1:3]
 
     if ban:
+        if status:
+            db.set_notified_ban_status(user_id, True)
+            mes.text_message(chat_id,
+                             "К сожалению вы заблокированы "
+                             "админиистрацией")
+            return
         if not status:
             db.set_notified_ban_status(user_id, True)
             mes.text_message(chat_id,
@@ -495,7 +504,7 @@ def query_handler(call):
 
             keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
             keyboard.add(telebot.types.InlineKeyboardButton(
-                text="Опубликовано ✅", callback_data="noAnswer"))
+                text="Опубликовать ✅", callback_data="noAnswer"))
             tb.edit_message_reply_markup(chat_id=chat_id,
                                          message_id=message_id,
                                          reply_markup=keyboard)
@@ -503,6 +512,7 @@ def query_handler(call):
             count += 1
             db.set_user_posts_count(user_id, count)
             mes.send_post(ID_POST_CHANNEL, new_post_id)
+            mes.posted(chat_id, user_id, new_post_id)
             return
 
         elif call_data_lowered[:8] == "edit_pbp":
@@ -1002,22 +1012,205 @@ def query_handler(call):
         elif call_data_lowered[:12] == "verification":
 
             left_part = call_data_lowered[13:]
-            # if not len(left_part):
-            #     if user_step in POSSIBLE_COME_TO_SHOW_VERIFICATION_TICKET:
-            #         return
-            #
-            #     db.get_
-        # elif call_data_lowered == "verification":
-        #
-        # elif call_data_lowered == "payverification":
-        #
-        # elif call_data_lowered[:14] == "buyingupsmenu":
-        #
-        # elif call_data_lowered[:14] == "buyingautoups":
-        #
-        # elif call_data_lowered[:18] == "buyingautoupsmode":
-        #
-        # elif call_data_lowered[:16] == "buyingmanualups":
+            if user_step not in POSSIBLE_COME_TO_VERIFICATION_TICKET:
+                return
+
+            if left_part == "1":
+                mes.send_verification_ticket(chat_id, message_id, user_id, page=1)
+                return
+
+            elif left_part == "2":
+                mes.send_verification_ticket(chat_id, message_id, user_id, page=2)
+                return
+
+            elif left_part == "new_ticket":
+                status = db.get_verification_ticket_status(user_id)[0]
+
+                if (status >> 7 & 1):
+                    mes.verified_by_admin(chat_id, message_id)
+                    return
+
+                if (status >> 5 & 1) and not (status >> 6 & 1):
+                    db.set_verification_ticket(user_id, "", "", "0")
+                    mes.send_verification_ticket(chat_id, message_id, user_id, page=1)
+                    return
+                else:
+                    mes.text_message(chat_id, T_HELP_VERIFICATION_EDIT)
+
+                return
+
+            elif left_part[:4] == "edit":
+
+                if len(left_part) < 5:
+                    return
+
+                if (status >> 7 & 1):
+                    mes.verified_by_admin(chat_id, message_id)
+                    return
+
+                if left_part[5] == "1":
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(text="Редактировать описание ✅",
+                                                                    callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+                    mes.enter_verification_text_nm(chat_id, user_id)
+                    return
+
+                elif left_part[5] == "2":
+                    keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(text="Редактировать контакты ✅",
+                                                                    callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+                    mes.enter_verification_contacts_nm(chat_id, user_id)
+                    return
+
+                return
+
+            elif left_part == "pay":
+                status = db.get_verification_ticket_status(user_id)[0]
+
+                if (status >> 7 & 1):
+                    mes.verified_by_admin(chat_id, message_id)
+                    return
+
+                if (status >> 3 & 1):
+                    mes.text_message(chat_id, "Вы уже все оплатили")
+                    return
+
+                if (status >> 4 & 1):
+                    mes.text_message(chat_id, "Ошибка")
+                    return
+                #
+                # keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                # keyboard.add(telebot.types.InlineKeyboardButton(text="Оплата ✅",
+                #                                                 callback_data="noAnswer"))
+                # tb.edit_message_reply_markup(chat_id=chat_id, message_id=message_id, reply_markup=keyboard)
+
+                mes.pay_verification(chat_id, user_id)
+                return
+
+            elif left_part == "send":
+                status = db.get_verification_ticket_status(user_id)[0]
+
+                if (status >> 7 & 1):
+                    mes.verified_by_admin(chat_id, message_id)
+                    return
+
+                if (status >> 3 & 1) and (status >> 2 & 1) and (status >> 1 & 1):
+                    status = (status | (1 << 4))
+                    db.set_verification_ticket_status(user_id, status)
+                    mes.send_verification_ticket(chat_id, message_id, user_id, page=1)
+                    mes.send_approve_verification_ticket_nm(ID_MANAGE_CHANNEL, user_id)
+                    mes.text_message(chat_id, "Отправлено")
+                    return
+
+                mes.text_message(chat_id, "Рано отправлять")
+                return
+
+            elif left_part == "cancel":
+                status = db.get_verification_ticket_status(user_id)[0]
+
+                if (status >> 7 & 1):
+                    mes.verified_by_admin(chat_id, message_id)
+                    return
+
+                if (status >> 4 & 1) and not (status >> 5 & 1):
+                    status = (status ^ (1 << 4))
+                    db.set_verification_ticket_status(user_id, status)
+                    mes.send_verification_ticket(chat_id, message_id, user_id, page=1)
+                    return
+
+                mes.text_message(chat_id, "Нечего отменять")
+                return
+
+            return
+
+        elif call_data_lowered[:10] == "buying_ups":
+            left_part = call_data_lowered[11:]
+
+            if left_part[:4] == "menu":
+                if user_step not in POSSIBLE_COME_TO_BUYING_UPS_MENU:
+                    return
+
+                try:
+                    post_id = int(left_part[5:])
+                except ValueError:
+                    return
+
+                mes.buying_ups_menu(chat_id, message_id,
+                                     user_id, post_id)
+                return
+
+            elif left_part[:4] == "auto":
+                if user_step not in POSSIBLE_COME_TO_BUYING_AUTO_UPS:
+                    return
+
+                try:
+                    post_id = int(left_part[5:])
+                except ValueError:
+                    return
+
+                mes.available_auto_rates(chat_id, message_id,
+                                         user_id, post_id)
+                return
+
+            elif left_part[:6] == "manual":
+                if user_step not in POSSIBLE_COME_TO_BUYING_MANUAL_UPS:
+                    return
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton("Ручные подъемы ✅",
+                    callback_data="noanswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+
+                mes.enter_manual_ups_nm(chat_id, user_id)
+                return
+
+            elif left_part[:4] == "rate":
+                if user_step not in POSSIBLE_COME_TO_RATES_UPS_MENU:
+                    return
+
+                try:
+                    left_part = left_part[5:]
+                    if not left_part.count("_"):
+                        raise ValueError
+
+                    index = left_part.index("_")
+                    post_id = int(left_part[:index])
+                    rate_id = int(left_part[index + 1:])
+
+                except ValueError:
+                    mes.text_message(chat_id, "Ошибка")
+                    return
+
+                rate_info = db.get_rate_time_and_price_if_exist(rate_id)
+                if not len(rate_info):
+                    mes.text_message(chat_id, "Такого тарифа не существует")
+                    return
+
+                update_time, price = rate_info
+
+                db.set_user_chose_rate_and_post_to(user_id, rate_id, post_id)
+
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton("1 раз в " +
+                                                                mes.nice_time(update_time) +
+                                                                " (" + str(price) + " р.) ✅",
+                                                                callback_data="noanswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+
+                mes.enter_auto_ups(chat_id, user_id)
+                return
+
+            return
         #
         # elif call_data_lowered[:8] == "getpost":
         #
@@ -1082,6 +1275,7 @@ def all_left_text_messages(message: telebot.types.Message):
     if len(user_info) == 0:
         adding_new_user(user_id)
         user_step = 0
+        user_info = (0, False, False, False)
     else:
         user_step = user_info[0]
 
@@ -1436,6 +1630,42 @@ def all_left_text_messages(message: telebot.types.Message):
             elif user_step == 123:
                 mes.send_prepared_post_nm(chat_id, user_id, True)
                 mes.edit_pbp_menu_nm(chat_id, user_id, 2)
+                return
+
+            elif user_step == 151:
+                mes.send_verification_ticket_nm(chat_id, user_id, page=1)
+                return
+
+            elif user_step == 152:
+                mes.send_verification_ticket_nm(chat_id, user_id, page=1)
+                return
+
+            elif user_step == 153:
+                mes.send_verification_ticket_nm(chat_id, user_id, page=1)
+                return
+
+            elif user_step == 160:
+                mes.send_posts_page_nm(chat_id, user_id, 1)
+                return
+
+            elif user_step == 161:
+                mes.send_posts_page_nm(chat_id, user_id, 1)
+                return
+
+            elif user_step == 162:
+                mes.send_posts_page_nm(chat_id, user_id, 1)
+                return
+
+            elif user_step == 163:
+                mes.send_posts_page_nm(chat_id, user_id, 1)
+                return
+
+            elif user_step == 164:
+                mes.send_posts_page_nm(chat_id, user_id, 1)
+                return
+
+            elif user_step == 165:
+                mes.send_posts_page_nm(chat_id, user_id, 1)
                 return
 
         elif lowered_message == "в главное меню" or lowered_message == \
@@ -2065,18 +2295,152 @@ def all_left_text_messages(message: telebot.types.Message):
             elif user_step == 124:
                 return
 
-    elif message.chat.type == "public":
+            elif user_step == 151:
+                ans, error_text = is_suitable_about_verification(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_verification_text(user_id, message.text)
+                status = db.get_verification_ticket_status(user_id)[0]
+                status = (status | (1 << 1))
+                db.set_verification_ticket_status(user_id, status)
+                mes.send_verification_ticket_nm(chat_id, user_id, page=1)
+                return
+
+            elif user_step == 152:
+                ans, error_text = is_suitable_links_verification(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_verification_contacts(user_id, message.text)
+                status = db.get_verification_ticket_status(user_id)[0]
+                status = (status | (1 << 2))
+                db.set_verification_ticket_status(user_id, status)
+                mes.send_verification_ticket_nm(chat_id, user_id, page=2)
+                return
+
+            elif user_step == 153:
+                return
+
+            elif user_step == 160:
+                return
+
+            elif user_step == 161:
+                ans, error_text = is_suitable_ups_count(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                mes.send_invoice_manual_ups(chat_id, user_id, int(message.text))
+                return
+
+            elif user_step == 162:
+                return
+
+            elif user_step == 163:
+                ans, error_text = is_suitable_ups_count(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+                rate_id, post_id = db.get_user_chose_rate_and_post_to(user_id)
+                post_owner_id = db.get_post_owner_id_if_exists(post_id)
+                if not len(post_owner_id):
+                    mes.text_message(chat_id, "Такого объявления не существует")
+                    return
+
+                post_owner_id = post_owner_id[0]
+
+                price = db.get_rate_price_if_exist(rate_id)
+                if not len(price):
+                    mes.text_message(chat_id, "Такого тарифа не существует")
+                    return
+
+                price = price[0]
+
+                mes.send_auto_ups_invoice(chat_id, user_id, post_id, rate_id, price, int(message.text))
+                return
+
+            elif user_step == 164:
+                return
+
+            elif user_step == 165:
+                return
+
+    elif message.chat.type == 'group':
 
         lowered_message = message.text.lower()
-
         ans = handle_common_command(lowered_message, chat_id, user_id)
         if ans:
             return
 
         if user_info[3]:  # ADMIN STATUS
-            ans = handle_admin_command(lowered_message, chat_id, user_id)
+            ans = handle_admin_command(lowered_message, chat_id, user_id,
+                                       chat_type=2)
             if ans:
                 return
+
+
+@tb.pre_checkout_query_handler(func=lambda query: True)
+def check(pre_checkout_query):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    user_info = db.get_user_step_ban_status_is_admin(user_id)
+
+    if len(user_info) == 0:
+        adding_new_user(user_id)
+        user_step = 0
+        user_info = (0, False, False, False)
+    else:
+        user_step = user_info[0]
+
+    ban, status = user_info[1:3]
+
+    if ban:
+        if status:
+            db.set_notified_ban_status(user_id, True)
+            mes.text_message(chat_id,
+                             "К сожалению вы заблокированы админиистрацией")
+            return
+
+    tb.answer_pre_checkout_query(pre_checkout_query.id,
+                                 ok=True, error_message="Ошибка")
+
+
+@tb.message_handler(content_types=['successful_payment'])
+def got_payment(message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+    user_info = db.get_user_step_ban_status_is_admin(user_id)
+
+    if len(user_info) == 0:
+        adding_new_user(user_id)
+        user_step = 0
+        user_info = (0, False, False, False)
+    else:
+        user_step = user_info[0]
+
+    ban, status = user_info[1:3]
+
+    if ban:
+        if status:
+            db.set_notified_ban_status(user_id, True)
+            mes.text_message(chat_id,
+                             "К сожалению вы заблокированы админиистрацией")
+            return
+
+    if message.successful_payment.invoice_payload == "201":
+        status = db.get_verification_ticket_status(user_id)[0]
+
+        status = (status | (1 << 3))
+        db.set_verification_ticket_status(user_id, status)
+
+        mes.verification_paid(chat_id)
+        mes.send_verification_ticket_nm(chat_id, user_id, page=1)
+        return
+
+    return
 
 
 #
@@ -2093,8 +2457,9 @@ def handle_common_command(command: str, chat_id: str or int, user_id: str or int
 
         mes.send_posts_page_nm(chat_id, user_id, page)
         return True
+
     elif command[:10] == "/open_post":
-        left_part = command[9:]
+        left_part = command[11:]
         try:
             post_id = int(left_part)
         except ValueError:
@@ -2111,13 +2476,13 @@ def handle_common_command(command: str, chat_id: str or int, user_id: str or int
 
 
 #
-def handle_admin_command(command: str, chat_id: str or int, user_id: str or int):
+def handle_admin_command(command: str, chat_id: str or int, user_id: str or int, chat_type=1):
     try:
         if str(command[:9]) == '/unverify':
             try:
                 user_id_to_unverify = command[10:]
-
-                user_id_to_unverify = user_id_to_unverify[:-1]
+                if user_id_to_unverify[-1] == "]":
+                    user_id_to_unverify = user_id_to_unverify[:-1]
 
                 user_id_to_unverify = int(user_id_to_unverify)
 
@@ -2126,21 +2491,26 @@ def handle_admin_command(command: str, chat_id: str or int, user_id: str or int)
                 return True
 
             db.set_user_verification_status(user_id_to_unverify, False)
+            status = db.get_user_verification_status(user_id_to_unverify)[0]
+            db.set_verification_ticket_status(user_id_to_unverify, status & 63)
             mes.text_message(chat_id,
                              "Если пользователь с таким ID существует, то его данные обновлены")
             return True
 
-        elif command[:7] == "/unverify":
+        elif command[:7] == "/verify":
             try:
                 user_id_to_verify = command[8:]
+                if user_id_to_verify[-1] == "]":
+                    user_id_to_verify = user_id_to_verify[:-1]
 
-                user_id_to_verify = user_id_to_verify[:-1]
                 user_id_to_verify = int(user_id_to_verify)
             except ValueError:
                 mes.text_message(chat_id, "Неверный формат id")
                 return True
 
+            status = db.get_user_verification_status(user_id_to_verify)[0]
             db.set_user_verification_status(user_id_to_verify, True)
+            db.set_verification_ticket_status(user_id_to_verify, status | 128)
             mes.text_message(chat_id,
                              "Если пользователь с таким ID существует, то его данные обновлены")
             return True
@@ -2259,7 +2629,7 @@ def handle_admin_command(command: str, chat_id: str or int, user_id: str or int)
                 return True
 
             db.set_admin_status(admin_id, True)
-            mes.text_message(user_id,
+            mes.text_message(chat_id,
                              "Если такой пользователь существует, "
                              "то он был назначен Администратором")
             return True
@@ -2274,12 +2644,79 @@ def handle_admin_command(command: str, chat_id: str or int, user_id: str or int)
                 return True
 
             db.set_admin_status(admin_id)
-            mes.text_message(user_id, "Если такой пользователь есть, то он перестал быть Администратором")
+            mes.text_message(chat_id, "Если такой пользователь есть, то он перестал быть Администратором")
             return True
 
         elif command[:9] == "/commands":
-            mes.text_message(user_id, T_COMMANDS_LIST)
+            mes.text_message(chat_id, T_COMMANDS_LIST)
             return True
+
+        if chat_type == 2:
+
+            if command[:10] == "/approve_v":
+                left_part = command[11:]
+
+                try:
+                    user_id_to_act = int(left_part)
+                except ValueError:
+                    mes.text_message(chat_id, "Команда введена неверно. "
+                                              "Неудается получить id пользователя")
+                    return True
+                status = db.get_verification_ticket_status(user_id_to_act)[0]
+
+                if (status >> 7 & 1):
+                    mes.text_message(chat_id, "Пользователь был верифицирован "
+                                              "лично администрацией. "
+                                              "(Через команду /verify)")
+                    return
+
+                if not (status >> 4 & 1):
+                    mes.text_message(chat_id, "Действие невозможно выполнить. "
+                                              "Пользователь отменил заявку "
+                                              "или ещё не отправлял её")
+                    return
+
+                if (status >> 5 & 1):
+                    if (status >> 6 & 1):
+                        mes.text_message(chat_id, "Пользователь уже верифицирован")
+                    else:
+                        mes.text_message(chat_id, "Пользователь не верифицирован. "
+                                                  "Последняя его заявка была "
+                                                  "отклонена, а новых он не отправлял")
+                    return
+
+                db.set_verification_status(user_id_to_act, True)
+                status = (status | (1 << 5) | (1 << 6))
+                db.set_verification_ticket_status(user_id, status)
+                mes.text_message(chat_id, str(user_id_to_act)
+                                 + " теперь верифицирован!")
+                return
+
+            elif command[:7] == "/deny_v":
+                left_part = command[8:]
+
+                try:
+                    user_id_to_act = int(left_part)
+                except ValueError:
+                    mes.text_message(chat_id, "Команда введена неверно. "
+                                              "Неудается получить id пользователя")
+                    return True
+                status = db.get_verification_ticket_status(user_id_to_act)[0]
+                if not (status >> 4 & 1):
+                    mes.text_message(chat_id, "Действие невозможно выполнить. "
+                                              "У пользователя нет ожидающих проверки запросов на верификацию")
+                    return
+
+                if (status >> 5 & 1):
+                    mes.text_message(chat_id, "Пользователь не отправлял"
+                                              " новых заявок с прошлого раза")
+                    return
+
+                db.set_verification_status(user_id_to_act, True)
+                status = (status | (1 << 5))
+                db.set_verification_ticket_status(user_id, status)
+                mes.text_message(chat_id, str(user_id_to_act) + " заяка на верификацию отклонена")
+                return
 
     except ValueError:
         mes.text_message(chat_id, "Неверный формат id")
@@ -2297,6 +2734,7 @@ def set_code(user_id, code, chat_id):
 #
 def adding_new_user(user_id: str):
     db.add_user(user_id, int(time.time()))
+    db.add_row_to_vtickets(user_id)
 
 
 #
