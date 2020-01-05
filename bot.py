@@ -997,13 +997,14 @@ def query_handler(call):
                 post_id = str(post_id)
             except ValueError:
                 return
-            try:
-                owner_id = db.get_post_owner_id(post_id)[0]
-                if owner_id != user_id:
-                    mes.text_message(chat_id, "Нельзя посмотреть чужое объявление")
-                    return
-            except FailedCallDatabase:
+
+            ans = db.get_post_owner_id_if_exists(post_id)
+            if not len(ans):
                 mes.text_message(chat_id, "Объявления с таким id не существует")
+                return
+
+            if ans[0] != user_id:
+                mes.text_message(chat_id, "Нельзя посмотреть чужое объявление")
                 return
 
             mes.get_post_nm(chat_id, post_id)
@@ -1154,6 +1155,10 @@ def query_handler(call):
                 except ValueError:
                     return
 
+                if db.get_post_rate(post_id)[0] != 0:
+                    mes.post_has_auto_ups(chat_id, message_id, post_id)
+                    return
+
                 mes.available_auto_rates(chat_id, message_id,
                                          user_id, post_id)
                 return
@@ -1189,6 +1194,10 @@ def query_handler(call):
                     mes.text_message(chat_id, "Ошибка")
                     return
 
+                if db.get_post_rate(post_id)[0] != 0:
+                    mes.post_has_auto_ups(chat_id, message_id, post_id)
+                    return
+
                 rate_info = db.get_rate_time_and_price_if_exist(rate_id)
                 if not len(rate_info):
                     mes.text_message(chat_id, "Такого тарифа не существует")
@@ -1211,10 +1220,47 @@ def query_handler(call):
                 return
 
             return
+
+        elif call_data_lowered[:2] == "up":
+            post_id = call_data_lowered[3:]
+
+            try:
+                post_id = int(post_id)
+            except ValueError:
+                return
+
+            ans = db.get_post_owner_id_and_last_up_and_rate_id_if_exists(post_id)
+            if not len(ans):
+                mes.text_message(chat_id, "Объявления с таким id не существует")
+                return
+
+            if ans[0] != user_id:
+                mes.text_message(chat_id, "Нельзя поднять чужое объявление")
+                return
+
+            if int(time.time()) - 10800 < ans[1]:
+                mes.text_message(chat_id, "Еще рано поднимать объявление. Осталось " + mes.nice_time(ans[1] + 10800 - int(time.time())))
+                return
+
+            manual_ups = db.get_user_manual_ups(user_id)[0]
+            if manual_ups == 0:
+                mes.no_manual_ups_nm(chat_id, post_id)
+                return
+
+            manual_ups -= 1
+            t = int(time.time())
+            db.set_manual_ups(user_id, manual_ups)
+            db.set_post_last_up(post_id, t)
+            if ans[2]:
+                update_time = db.get_rate_time(ans[2])[0]
+                db.set_time_to_do_auto_post(post_id, t + update_time)
+
+            mes.send_post(ID_POST_CHANNEL, post_id)
+            mes.get_post(chat_id, message_id, post_id)
+            return
         #
         # elif call_data_lowered[:8] == "getpost":
         #
-        # elif call_data_lowered[:2] == "up":
         #
         # elif call_data_lowered[:4] == "edit":
         #     left_part = call_data_lowered[4:]
@@ -1256,7 +1302,7 @@ def query_handler(call):
         #
 
     elif call.chat.type == "group" and chat_id in ALLOWED_GROUP_CHATS:
-        pass
+        return
 
 
 @tb.message_handler()
@@ -2351,6 +2397,9 @@ def all_left_text_messages(message: telebot.types.Message):
                     return
 
                 post_owner_id = post_owner_id[0]
+                if post_owner_id != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
 
                 price = db.get_rate_price_if_exist(rate_id)
                 if not len(price):
@@ -2359,7 +2408,8 @@ def all_left_text_messages(message: telebot.types.Message):
 
                 price = price[0]
 
-                mes.send_auto_ups_invoice(chat_id, user_id, post_id, rate_id, price, int(message.text))
+                mes.send_auto_ups_invoice(chat_id, user_id, post_id,
+                                          rate_id, price, int(message.text))
                 return
 
             elif user_step == 164:
@@ -2384,9 +2434,13 @@ def all_left_text_messages(message: telebot.types.Message):
 
 @tb.pre_checkout_query_handler(func=lambda query: True)
 def check(pre_checkout_query):
-    user_id = message.from_user.id
-    chat_id = message.chat.id
+    user_id = pre_checkout_query.from_user.id
     user_info = db.get_user_step_ban_status_is_admin(user_id)
+    with open(P_ACTIONS, "a") as f:
+        f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ERROR PAYMENT",
+                              time.gmtime(time.time())) + str(
+                              user_id) + " " + str(
+                              pre_checkout_query.id) + "\n")
 
     if len(user_info) == 0:
         adding_new_user(user_id)
@@ -2398,11 +2452,7 @@ def check(pre_checkout_query):
     ban, status = user_info[1:3]
 
     if ban:
-        if status:
-            db.set_notified_ban_status(user_id, True)
-            mes.text_message(chat_id,
-                             "К сожалению вы заблокированы админиистрацией")
-            return
+        return
 
     tb.answer_pre_checkout_query(pre_checkout_query.id,
                                  ok=True, error_message="Ошибка")
@@ -2410,9 +2460,14 @@ def check(pre_checkout_query):
 
 @tb.message_handler(content_types=['successful_payment'])
 def got_payment(message):
+    with open(P_ACTIONS, "a") as f:
+        f.write(time.strftime("[%H:%M:%S %d.%m.%Y] ",
+                              time.gmtime(time.time())) + str(
+            message.chat.id) + " " + message.successful_payment.invoice_payload + "\n")
     user_id = message.from_user.id
     chat_id = message.chat.id
     user_info = db.get_user_step_ban_status_is_admin(user_id)
+    invoice_payload = message.successful_payment.invoice_payload
 
     if len(user_info) == 0:
         adding_new_user(user_id)
@@ -2430,7 +2485,7 @@ def got_payment(message):
                              "К сожалению вы заблокированы админиистрацией")
             return
 
-    if message.successful_payment.invoice_payload == "201":
+    if invoice_payload == "201":
         status = db.get_verification_ticket_status(user_id)[0]
 
         status = (status | (1 << 3))
@@ -2440,6 +2495,55 @@ def got_payment(message):
         mes.send_verification_ticket_nm(chat_id, user_id, page=1)
         return
 
+    elif invoice_payload[:3] == "202":
+        invoice_payload = invoice_payload[4:]
+        try:
+            ups = int(invoice_payload)
+        except ValueError:
+            mes.text_message(chat_id, "Ошибка")
+            return
+
+        manual_ups = db.get_user_manual_ups(user_id)[0]
+        manual_ups += ups
+        db.set_manual_ups(user_id, manual_ups)
+        mes.text_message(chat_id, "Успешная покупка. "
+                                  "Теперь у вас " + str(
+                                   manual_ups) + " подъемов.")
+        return
+
+    elif invoice_payload[:3] == "203":
+        try:
+            invoice_payload = invoice_payload[4:]
+            index = invoice_payload.index(":")
+            index2 = invoice_payload.index("=")
+            rate_id = int(invoice_payload[:index])
+            post_id = int(invoice_payload[index + 1:index2])
+            ups = int(invoice_payload[index2 + 1:])
+            print(rate_id, post_id, ups)
+        except ValueError:
+            mes.text_message(chat_id, "Ошибка")
+            return
+
+        rate_info = db.get_rate_time_if_exist(rate_id)
+        if len(rate_info) == 0:
+            mes.text_message(chat_id, "Ошибка")
+            return
+
+        post_info = db.get_post_owner_id_if_exists(post_id)
+        if len(post_info) == 0 or post_info[0] != user_id:
+            mes.text_message(chat_id, "Ошибка")
+            return
+
+        update_time = rate_info[0]
+        db.set_post_auto_ups_info(post_id, rate_id, ups)
+        db.add_auto_actions_task(1, int(time.time()) + update_time,
+                              post_id, update_time, rate_id,
+                              maxcount=ups)
+
+        mes.text_message(chat_id, "Успешная покупка. Теперь объявление будет "
+                                  "автоматически публиковаться "
+                                  "раз в " + mes.nice_time(update_time))
+        return
     return
 
 
@@ -2473,6 +2577,51 @@ def handle_common_command(command: str, chat_id: str or int, user_id: str or int
 
         mes.get_post_nm(chat_id, post_id)
         return True
+
+    # TODO  reports bot
+    # elif command[:7] == "/report":
+    #     left_part = command[8:]
+    #     try:
+    #         post_id = int(left_part)
+    #     except ValueError:
+    #         return
+    #
+    #     ans = db.get_user_report_if_exist(user_id, post_id)
+    #     if len(ans):
+    #         mes.text_message(chat_id, "Вы уже жаловались на это объявление")
+    #         return
+    #
+    #     reports = ans.get_post_reports(post_id)
+    #     reports += 1
+    #     db.add_user_report(user_id, post_id)
+    #
+    #     if are_reports_enough(reports):
+    #         db.set_post_reports_and_sent_status(post_id, reports, True)
+    #         mes.send_report_ticket(ID_MANAGE_CHANNEL, post_id)
+    #         return
+    #
+    #     db.set_post_reports(post_id, reports)
+    #     mes.text_message(chat_id, "Ваша жалоба отправлена")
+    #     return
+    #
+    # elif command[:14] == "/cancel_report":
+    #     left_part = command[15:]
+    #     try:
+    #         post_id = int(left_part)
+    #     except ValueError:
+    #         return
+    #
+    #     ans = db.get_user_report_if_exist(user_id, post_id)
+    #     if not len(ans):
+    #         mes.text_message(chat_id, "Вы ещё не жаловались на это объявление")
+    #         return
+    #
+    #     reports = ans.get_post_reports(post_id)
+    #     reports -= 1
+    #     db.del_user_report(user_id, post_id)
+    #     db.set_post_reports(post_id, reports)
+    #     mes.text_message(chat_id, "Ваша жалоба отменена")
+    #     return
 
 
 #
@@ -2742,18 +2891,22 @@ def auto_actions():
     while True:
         actions = db.get_available_auto_actions(time.time())
         # [0] action_type
-        #   1 [1] post_id, counts, plus_time, rate_id, [5] message_id
+        #   1 [1] post_id, counts, plus_time, rate_id, [5] message_id, maxcount
 
         for action in actions:
             if action[0] == 1:
                 mes.send_post(ID_POST_CHANNEL, action[1])
-                tt = time.time()
-                db.set_post_last_up_and_counts(action[1], tt, action[2] - 1)
-                if action[2] > 1:
-                    db.set_next_post_up_in_auto_post(action[1], action[2] - 1,
+                new_actions = action[2] + 1
+
+                if action[6] > new_actions:
+                    tt = int(time.time())
+                    db.set_post_last_up_and_used_counts(action[1], tt, new_actions)
+                    db.set_next_post_up_in_auto_post(action[1], new_actions,
                                                      tt + action[3])
                 else:
                     db.delete_auto_action_with_post_id(action[1])
+                    db.set_post_auto_ups_info(action[1], 0, 0)
+                    return
 
             elif actions[0] == 2:
                 tb.edit_message_reply_markup(chat_id=ID_POST_CHANNEL,

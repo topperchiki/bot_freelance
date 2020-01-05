@@ -162,8 +162,8 @@ def get_all_rates():
 
 @d_db_empty
 def set_rate_show_status(rate_id: str or int, value: bool):
-    return "UPDATE rates SET show = %s WHERE rate_id = %s", \
-           (str(rate_id), str(value))
+    return "UPDATE rates SET showed = %s WHERE rate_id = %s", \
+           (str(value), str(rate_id))
 
 
 @d_db_empty
@@ -173,13 +173,13 @@ def delete_rate(rate_id: str or int):
 
 @d_db_empty
 def clear_posts_rates(rate_id: str or int):
-    return "UPDATE posts SET auto_ups = NULL, auto_ups_type = NULL " \
-           "WHERE auto_ups_type = %s", (str(rate_id),)
+    return "UPDATE posts SET auto_ups = NULL, rate_id = NULL " \
+           "WHERE rate_id = %s", (str(rate_id),)
 
 
 @d_db_all
 def get_all_posts_with_the_rate(rate_id: str or int):
-    return "SELECT post_id FROM posts WHERE auto_ups_type = %s", (str(rate_id),)
+    return "SELECT post_id FROM posts WHERE rate_id = %s", (str(rate_id),)
 
 
 @d_db_empty
@@ -249,7 +249,7 @@ def get_count_user_posts(user_id: str or int):
 @d_db_one
 def get_post_info(post_id: str or int):
     # type, title, category, time_last_up, rate_id, auto_ups
-    return "SELECT type, title, categories, last_up, rate_id, auto_ups " \
+    return "SELECT type, title, categories, last_up, rate_id, auto_ups, auto_ups_used " \
            "FROM posts WHERE post_id = %s", \
            (str(post_id),)
 
@@ -292,7 +292,7 @@ def set_post_last_up(post_id: str or int, update_time: str or int):
 @d_db_all_exist
 def get_available_auto_actions(time_to_check: int or str):
     return "SELECT action_type, post_id, counts, " \
-           "plus_time, rate_id, message_id FROM auto_actions " \
+           "plus_time, rate_id, message_id, maxcount FROM auto_actions " \
            "WHERE time_to_do < %s", \
            (str(int(time_to_check)),)
 
@@ -300,9 +300,15 @@ def get_available_auto_actions(time_to_check: int or str):
 @d_db_empty
 def set_next_post_up_in_auto_post(post_id: str or int,
                                   counts: int or str, new_time: int or str):
-    return "UPDATE auto_actions SET count = %s, " \
+    return "UPDATE auto_actions SET counts = %s, " \
            "time_to_do = %s WHERE post_id = %s", \
            (str(counts), str(new_time), str(post_id))
+
+
+@d_db_empty
+def set_time_to_do_auto_post(post_id: str or int, new_time: int or str):
+    return "UPDATE auto_actions SET time_to_do = %s WHERE post_id = %s", \
+           (str(new_time), str(post_id))
 
 
 @d_db_empty
@@ -316,10 +322,20 @@ def delete_auto_action_with_message_id(message_id: str or int):
 
 
 @d_db_empty
-def set_post_last_up_and_counts(post_id: str or int,
-                                update_time: str or int, auto_ups: str or int):
-    return "UPDATE posts SET last_up = %s, auto_ups = %s WHERE post_id = %s", \
-           (str(update_time), str(post_id), str(auto_ups))
+def set_post_last_up_and_used_counts(post_id: str or int,
+                                update_time: str or int, auto_ups_used: str or int):
+    return "UPDATE posts SET last_up = %s, auto_ups_used = %s WHERE post_id = %s", \
+           (str(update_time), str(auto_ups_used), str(post_id))
+
+
+@d_db_empty
+def add_auto_actions_task(act_type: int, time_to_do, post_id: str or int=0, plus_time=0,
+                          rate_id=0, message_id=0, maxcount=0):
+    return "INSERT INTO auto_actions(action_type, time_to_do, " \
+           "post_id, plus_time, rate_id, message_id, maxcount) VALUES " \
+           "(%s, %s, %s, %s, %s, %s, %s)", \
+           (str(act_type), str(time_to_do), str(post_id), str(plus_time),
+            str(rate_id), str(message_id), str(maxcount))
 
 
 @d_db_empty
@@ -652,11 +668,17 @@ def get_post_owner_id_if_exists(post_id: str or int):
     return "SELECT owner_id FROM posts WHERE post_id = %s", (str(post_id), )
 
 
+@d_db_exist
+def get_post_owner_id_and_last_up_and_rate_id_if_exists(post_id: str or int):
+    return "SELECT owner_id, last_up, rate_id FROM posts WHERE post_id = %s", \
+           (str(post_id), )
+
+
 @d_db_one
 def get_post_all(post_id: str or int):
     return "SELECT type, title, description, memo, portfolio, contacts, " \
            "categories, price, pay_type, guarantee, creation_date, last_up, " \
-           "auto_ups, auto_ups_used, owner_id " \
+           "auto_ups, auto_ups_used, rate_id, owner_id " \
            "FROM posts WHERE post_id = %s", \
            (str(post_id),)
 
@@ -764,6 +786,12 @@ def get_rate_price_if_exist(rate_id: str or int):
            (str(rate_id), )
 
 
+@d_db_exist
+def get_rate_time_if_exist(rate_id: str or int):
+    return 'SELECT update_time FROM rates WHERE rate_id = %s', \
+           (str(rate_id), )
+
+
 @d_db_empty
 def set_user_chose_rate_and_post_to(user_id: str or int,
                                     rate_id: str or int, post_id: str or int):
@@ -775,3 +803,60 @@ def set_user_chose_rate_and_post_to(user_id: str or int,
 def get_user_chose_rate_and_post_to(user_id: str or int):
     return 'SELECT chose_rate, post_to FROM users WHERE user_id = %s', \
            (str(user_id), )
+
+
+@d_db_one
+def get_post_rate(post_id: str or int):
+    return "SELECT rate_id FROM posts WHERE post_id = %s", (str(post_id),)
+
+
+@d_db_empty
+def set_post_auto_ups_info(post_id: str or int,
+                           rate_id: str or int, ups: str or int):
+    return "UPDATE posts SET rate_id = %s, " \
+           "auto_ups = %s, auto_ups_used = 0 WHERE post_id = %s", \
+           (str(rate_id), str(ups), str(post_id))
+
+
+
+# TODO  reports db
+# @d_db_exist
+# def get_user_report_if_exist(user_id: str or int, post_id: str or int):
+#     return 'SELECT user_id FROM reports WHERE user_id = %s, ' \
+#            'post_id = %s', \
+#            (str(user_id), str(post_id))
+#
+#
+# @d_db_empty
+# def add_user_report(user_id: str or int, post_id: str or int):
+#     return 'INSERT INTO reports(user_id, post_id) VALUES (%s, %s)',
+#             (str(user_id), str(post_id))
+#
+#
+# @d_db_empty
+# def del_user_report(user_id: str or int, post_id: str or int):
+#     return "DELETE FROM reports WHERE user_id = %s, post_id = %s", \
+#            (str(user_id), str(post_id))
+#
+#
+# @d_db_empty
+# def set_post_reports(post_id: str or int, reports: int or str):
+#     return 'UPDATE posts SET reports = %s WHERE post_id = %s', \
+#            (str(reports), str(post_id))
+#
+#
+# @d_db_empty
+# def set_post_reports_and_sent_status(post_id: str or int, reports: int or str, status: bool):
+#     return 'UPDATE posts SET reports = %s, report_was_sent = %s WHERE post_id = %s', \
+#            (str(reports), str(status), str(post_id))
+#
+#
+# @d_db_one
+# def get_post_reports(post_id: str or int):
+#     return 'SELECT reports FROM posts WHERE post_id = %s', \
+#            (str(post_id), )
+#
+# @d_db_empty
+# def del_all_post_report(post_id: str or int):
+#     return "DELETE FROM reports WHERE post_id = %s", \
+#            (str(post_id))

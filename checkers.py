@@ -214,3 +214,9 @@ def is_need_to_delete(post):
     if post["reported"] > 15:
         return True
     return False
+
+
+def are_reports_enough(reports: int):
+    if reports >= 5:
+        return True
+    return False

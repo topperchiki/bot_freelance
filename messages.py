@@ -94,8 +94,8 @@ def gen_keyboard_listing(now: int, num_all_pages: int):
 
 def nice_time(time_value: int):
     seconds = time_value % 60
-    minutes = time_value // 60
-    hours = time_value // 3600
+    minutes = time_value % 3600 // 60
+    hours = time_value % 86400 // 3600
     days = time_value // 86400
 
     text = ""
@@ -144,7 +144,7 @@ def get_posts_on_page(user_id: str or int, page: int):
 
     for post_id in posts[start: start + 10]:
         post = db.get_post_info(post_id[0])
-        # type, title, category, time_last_up, rate_id, auto_ups
+        # type, title, category, time_last_up, rate_id, auto_ups, auto_ups_used
         text += "/open_post_" + str(post_id[0]) + "\n"
         if post[0] == 1:
             text += "#Исполнитель\n"
@@ -158,7 +158,7 @@ def get_posts_on_page(user_id: str or int, page: int):
         text += time.strftime("Поднято: %H:%M:%S %d.%m.%Y", time.gmtime(post[3])) + "\n"
         has_up = False
         if post[4]:
-            text += "АвтоПодъемы (кол-во/ поднятие раз в): " + str(post[5]) + "/" + nice_time(db.get_rate_time(post[4]))
+            text += "АвтоПодъемы (кол-во/поднятие раз в): " + str(post[5] - post[6]) + "/" + nice_time(db.get_rate_time(post[4])[0])
             has_up = True
         if has_up:
             text += "\n\n"
@@ -347,13 +347,13 @@ def get_post_building(post_id: str or int):
                                                       time.gmtime(post[11]))
 
     text += "\n"
-    # if post[11]:
-    #     rate_time = db.get_rate_time(post[11])[0]
-    #     text += "Подъемы раз в " + nice_time(rate_time) + \
-    #             "✅, осталось " + str(post[12])
-    #     text += "\n"
-    # else:
-    text += "Нет подъемов\n"
+    if post[14]:
+        rate_time = db.get_rate_time(post[14])[0]
+        text += "Подъемы раз в " + nice_time(rate_time) + \
+                "✅, осталось " + str(post[12] - post[13])
+        text += "\n"
+    else:
+        text += "Нет автоматических подъемов\n"
 
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     if post[0] == 1 and len(post[4]) > 0:
@@ -361,9 +361,13 @@ def get_post_building(post_id: str or int):
             types.InlineKeyboardButton(text="Портфолио", url=post[4]))
     keyboard.add(types.InlineKeyboardButton(text="Редактировать", callback_data="noanswer"))
                                             #callback_data="edit:" + post_id))
-    manual_ups = db.get_user_manual_ups(post[14])
-    keyboard.add(types.InlineKeyboardButton(text="Поднять (" + str(manual_ups[0]) + ")", callback_data="noanswer")) #callback_data="up:" + post_id))
-    keyboard.add(types.InlineKeyboardButton(text="Купить подъемы", callback_data="buying_Ups_Menu:" + post_id)) #callback_data="buyingUpsMenu:" + post_id))
+    manual_ups = db.get_user_manual_ups(post[15])
+    if int(time.time()) - 10800 >= post[11]:
+        keyboard.add(types.InlineKeyboardButton(text="Поднять (" + str(manual_ups[0]) + ")", callback_data="up_" + post_id))
+    else:
+        keyboard.add(types.InlineKeyboardButton(text="Поднято ✅ (" + str(
+                                                manual_ups[0]) + ")", callback_data="up_" + post_id))
+    keyboard.add(types.InlineKeyboardButton(text="Купить подъемы", callback_data="buying_Ups_Menu:" + post_id))
     return text, keyboard
 
 
@@ -606,7 +610,7 @@ def help_nm(chat_id: int or str, admin=False):
 
 def generate_referral(chat_id, user_id):
     code = '666'
-    sms = 'Пригласите 5 друзей по данной ссылке и получите 1 ручной подъем! '+ 'https://t.me/Mytoserbot?start=' + code
+    sms = URL_ACTION_START_REFERRAL + code
 
     tb.send_message(chat_id=chat_id, text = sms)
 
@@ -1392,7 +1396,7 @@ def available_auto_rates(chat_id: str or int, message_id: str or int,
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     if not len(rates):
         text = "К сожалению, сейчас нет доступных вариантов автоматических подъемов"
-        keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="buying_ups_menu_" + str(user_id)))
+        keyboard.add(types.InlineKeyboardButton(text="Назад", callback_data="buying_ups_menu_" + str(post_id)))
         tb.edit_message_text(text=text, chat_id=chat_id,
                              message_id=message_id, reply_markup=keyboard)
         return
@@ -1400,8 +1404,8 @@ def available_auto_rates(chat_id: str or int, message_id: str or int,
     post_id = str(post_id)
     for rate in rates:
         t = "1 раз в " + nice_time(rate[1]) + " (" + str(rate[2]) + "р.)"
-        keyboard.add(types.InlineKeyboardButton(text=t,
-                                                callback_data="buying_ups_rate_" + str(post_id) + " " + str(rate[0])))
+        cl_data = "buying_ups_rate_" + str(post_id) + "_" + str(rate[0])
+        keyboard.add(types.InlineKeyboardButton(text=t, callback_data=cl_data))
 
     tb.edit_message_text(text=text, reply_markup=keyboard,
                          message_id=message_id, chat_id=chat_id)
@@ -1415,11 +1419,12 @@ def enter_auto_ups(chat_id: str or int, user_id: str or int):
 
 
 def send_invoice_manual_ups(chat_id: str or int, user_id: str or int,
-                            price: int, auto_ups: int):
-    return
-    # f = [types.LabeledPrice(label='Verification', amount=500 * 100)]
-    #     tb.send_invoice(message_id, 'Подтверждение аккаунта', 'Верификация',
-    #                     '126', PAYMENT_PROVIDER, 'RUB', f, start_parameter='f')
+                            manual_ups: int):
+    manual_ups_str = str(manual_ups)
+    f = [types.LabeledPrice(label='Ручные поднятия ' + manual_ups_str,
+                            amount=MANUAL_UPS_PRICE * int(manual_ups) * 100)]
+    tb.send_invoice(chat_id, 'Покупка подъемов', 'Ручные поднятия ' + manual_ups_str,
+                        '202_' + manual_ups_str, PAYMENT_PROVIDER, 'RUB', f, start_parameter='f')
 
 
 def verification_paid(chat_id: str or int):
@@ -1432,3 +1437,43 @@ def verified_by_admin(chat_id: str or int, message_id: str or int):
     tb.edit_message_text(text=text, chat_id=chat_id,
                          message_id=message_id, reply_markup=keyboard)
 
+
+def post_has_auto_ups(chat_id: str or int, message_id: str or int,
+                      post_id: str or int):
+    post_id = str(post_id)
+    text = "Дождитесь, пока у данного объявления " \
+           "не закончатся предыдущие автоматические подъемы"
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        types.InlineKeyboardButton(text="Назад",
+                                   callback_data="get_" + str(post_id)))
+    tb.edit_message_text(text=text, chat_id=chat_id,
+                         message_id=message_id, reply_markup=keyboard)
+
+
+def send_auto_ups_invoice(chat_id: str or int,
+                          user_id: str or int, post_id: str or int,
+                          rate_id: str or int, price: int, ups: int):
+    ups_str = str(ups)
+    f = [types.LabeledPrice(label='Автоматические поднятия ' + ups_str,
+                            amount=100 * int(ups) * price)]
+    tb.send_invoice(chat_id, 'Покупка подъемов',
+                    'Автоматические поднятия ' + ups_str,
+                    '203_' + str(rate_id) + ":" +
+                    str(post_id) + "=" + ups_str,
+                    PAYMENT_PROVIDER, 'RUB', f, start_parameter='f')
+
+
+def no_manual_ups_nm(chat_id: str or int, post_id: str or int):
+    post_id = str(post_id)
+    text = "У вас нет ручных подъемов"
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(text="Купить", callback_data="buying_ups_menu_" + post_id))
+    tb.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+
+
+# TODO  reports messages
+# def send_report_ticket(chat_id: str or int, post_id: str or int):
+#     post_id = str(post_id)
+#
+#     text = "Жалоба на пост"

@@ -3,6 +3,16 @@ import db
 import json
 
 
+# TODO  reports db_setup2
+# def create_reports_table(connection: psycopg2.extensions.connection):
+#     cursor = connection.cursor()
+#     cursor.execute('''CREATE TABLE reports(
+#                                 user_id INT NOT NULL,
+#                                 post_id INT NOT NULL
+#                                 )''')
+#     cursor.close()
+
+
 def create_verification_tickets_table(connection: psycopg2.extensions.connection):
     cursor = connection.cursor()
     cursor.execute('''CREATE TABLE vtickets(
@@ -29,10 +39,11 @@ def create_auto_actions_table(connection: psycopg2.extensions.connection):
                                 action_type INT NOT NULL,
                                 time_to_do INT NOT NULL,
                                 post_id INT,
-                                counts INT,
+                                counts INT DEFAULT 0,
                                 plus_time INT,
                                 rate_id INT,
-                                message_id INT
+                                message_id INT,
+                                maxcount INT
                                 )''')
     cursor.close()
 
@@ -114,8 +125,7 @@ def create_posts_table(connection: psycopg2.extensions.connection):
                                rate_id INT DEFAULT 0,
                                last_up INT DEFAULT 0,
 
-                               reported INT DEFAULT 0,
-                               users_reported TEXT,
+                               reports INT DEFAULT 0,
                                report_was_sent BOOLEAN DEFAULT FALSE
                                 )''')
     cursor.close()
