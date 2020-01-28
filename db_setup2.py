@@ -3,14 +3,14 @@ import db
 import json
 
 
-# TODO  reports db_setup2
-# def create_reports_table(connection: psycopg2.extensions.connection):
-#     cursor = connection.cursor()
-#     cursor.execute('''CREATE TABLE reports(
-#                                 user_id INT NOT NULL,
-#                                 post_id INT NOT NULL
-#                                 )''')
-#     cursor.close()
+def create_reports_table(connection: psycopg2.extensions.connection):
+    cursor = connection.cursor()
+    cursor.execute('''CREATE TABLE reports(
+                                user_id INT NOT NULL,
+                                post_id INT NOT NULL,
+                                date INT DEFAULT 0
+                                )''')
+    cursor.close()
 
 
 def create_verification_tickets_table(connection: psycopg2.extensions.connection):
@@ -124,9 +124,13 @@ def create_posts_table(connection: psycopg2.extensions.connection):
                                auto_ups_used INT DEFAULT 0,
                                rate_id INT DEFAULT 0,
                                last_up INT DEFAULT 0,
+                               last_edit INT DEFAULT 0,
 
                                reports INT DEFAULT 0,
-                               report_was_sent BOOLEAN DEFAULT FALSE
+                               report_was_sent BOOLEAN DEFAULT FALSE,
+                               
+                               new_categories TEXT,
+                               new_prices TEXT
                                 )''')
     cursor.close()
 
@@ -141,14 +145,14 @@ def create_users_table(connection: psycopg2.extensions.connection):
                                 admin BOOLEAN NOT NULL DEFAULT FALSE,
                                 posts_count INT NOT NULL DEFAULT 0,
                                 manual_ups INT NOT NULL DEFAULT 0,
-                                spent_money INT NOT NULL DEFAULT 0,
                                 verified BOOLEAN NOT NULL DEFAULT FALSE,
-                                referral_id INT,
+                                referral_id INT DEFAULT 0,
                                 referral_author INT,
                                 banned BOOLEAN NOT NULL DEFAULT FALSE,
                                 notified_ban BOOLEAN NOT NULL DEFAULT FALSE,
                                 chose_rate INT,
-                                post_to INT
+                                post_to INT,
+                                post_editing INT
                                 )''')
     cursor.close()
 

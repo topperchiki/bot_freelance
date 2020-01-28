@@ -359,8 +359,7 @@ def get_post_building(post_id: str or int):
     if post[0] == 1 and len(post[4]) > 0:
         keyboard.add(
             types.InlineKeyboardButton(text="Портфолио", url=post[4]))
-    keyboard.add(types.InlineKeyboardButton(text="Редактировать", callback_data="noanswer"))
-                                            #callback_data="edit:" + post_id))
+    keyboard.add(types.InlineKeyboardButton(text="Редактировать", callback_data="edit_menu_" + post_id))
     manual_ups = db.get_user_manual_ups(post[15])
     if int(time.time()) - 10800 >= post[11]:
         keyboard.add(types.InlineKeyboardButton(text="Поднять (" + str(manual_ups[0]) + ")", callback_data="up_" + post_id))
@@ -545,6 +544,34 @@ def verified_by_admin_building():
     return text, keyboard
 
 
+def edit_post_building(post_id: str or int):
+    post_type = db.get_post_type(post_id)
+    text = "Редактировать"
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton(text="Категории", callback_data="/edit_categories_" + post_id))
+    keyboard.add(
+        types.InlineKeyboardButton(text="Название", callback_data="/edit_title_" + post_id),
+        types.InlineKeyboardButton(text="Описание", callback_data="/edit_description_" + post_id))
+    if post_type == 1:
+        keyboard.add(
+            types.InlineKeyboardButton(text="Памятку", callback_data="/edit_memo_" + post_id),
+            types.InlineKeyboardButton(text="Портфолио",
+                                       callback_data="/edit_portfolio_l_" + post_id))
+
+    elif post_type == 2:
+        keyboard.add(
+            types.InlineKeyboardButton(text="Необходимость портфолио",
+                                       callback_data="/edit_portfolio_?_" + post_id))
+
+    keyboard.add(
+        types.InlineKeyboardButton(text="Название", callback_data="/edit_contacts_" + post_id),
+        types.InlineKeyboardButton(text="Название", callback_data="/edit_payment_" + post_id))
+    keyboard.add(
+        types.InlineKeyboardButton(text="Название", callback_data="/edit_guarantee_" + post_id))
+    return text, keyboard
+
+
 #
 def main_menu_nm(chat_id: str or int, user_id: str or int):
     db.set_user_step(user_id, 1)
@@ -608,8 +635,7 @@ def help_nm(chat_id: int or str, admin=False):
     tb.send_message(chat_id=chat_id, text=text)
 
 
-def generate_referral(chat_id, user_id):
-    code = '666'
+def generate_referral(chat_id, code):
     sms = URL_ACTION_START_REFERRAL + code
 
     tb.send_message(chat_id=chat_id, text = sms)
@@ -1472,8 +1498,240 @@ def no_manual_ups_nm(chat_id: str or int, post_id: str or int):
     tb.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
 
 
-# TODO  reports messages
-# def send_report_ticket(chat_id: str or int, post_id: str or int):
-#     post_id = str(post_id)
-#
-#     text = "Жалоба на пост"
+def send_report_ticket(chat_id: str or int, post_id: str or int):
+    post_id = str(post_id)
+
+    text = "Жалоба на объявление " + post_id + "\n"
+    text += "Обнулить жалобы /reset_report_" + post_id
+    text += "\nУдалить объявление из БД /delete_post_" + post_id
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def send_user_info(chat_id: str or int, user_id: str or int):
+    user_info = db.get_user_info(user_id)
+    text = "ID: " + user_id + "\n"
+    if user_info[4]:
+        text += "Верифицирован\n"
+    if user_info[7]:
+        text += "Заблокирован\n"
+        if user_info[8]:
+            text += "Предупрежден о блокировке\n"
+    text += "\n"
+
+    text += "Кол-во объявлений: " + str(user_info[1]) + "\n"
+    text += "Потрачено денег: " + str(user_info[3]) + "р. \n"
+    if user_info[5]:
+        text += "Использовал код(id): " + str(user_info[5]) + "\n"
+
+    text += "Автор кода(id): " + str(user_info[6]) + "\n"
+
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def send_post_info(chat_id: str or int, post_id: str or int):
+    post_info = db.get_post_info_admin(post_id)
+    text = "ID: " + str(post_id) + "\n"
+    if post_info[2] == 1:
+        text += "Исполнитель\n"
+    else:
+        text += "Заказчик\n"
+    text += "Владелец: " + str(post_info[0]) + "\n"
+    text += "Дата создания: " + nice_time(post_info[1]) + "\n\n"
+    if post_info[3]:
+        text += "Автоподъем: " + str(post_info[5]) + " "
+        text += str(post_info[4]) + "/" + str(post_info[3]) + "\n"
+
+    else:
+        text += "Нет автоподъемов\n"
+    text += "Жалоб: " + str(post_info[7]) + "\n"
+    if post_info[7]:
+        if post_info[8]:
+            text += "Объявления отправлено на проверку\n"
+        else:
+            text += "Объявление не превысило лимит по жалобам\n"
+
+    text += "\n" + nice_time(post_info[6]) + "\n"
+
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def send_rate_info(chat_id: str or int, rate_id: str or int):
+    rate_info = db.get_rate_info(rate_id)
+    text = "ID: " + str(rate_id) + "\n"
+    text += "Обновление раз в " + nice_time(rate_info[0]) + "\n"
+    text += "Стоимость за 1 подъем - " + str(rate_info[1]) + " \n"
+    if rate_info[2]:
+        text += "Показывается"
+    else:
+        text += "Скрыт"
+
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def send_admin_posts(chat_id: str or int, user_id: str or int, page: int):
+    posts = db.get_user_posts(user_id, (page - 1) * 10, 10)
+    if len(posts):
+        count = db.get_user_posts_count(user_id)[0]
+        if count == 0:
+            text = "У пользователя нет объявлений"
+        else:
+            text = "На этой странице нет объявлений. " \
+                   "Всего у пользователя " + str(count) + " объявлений\n"
+        tb.send_message(chat_id=chat_id, text=text)
+        return
+
+    text = ""
+    for post in posts:
+        post_info = db.get_post_info(post)
+        text += "ID: " + str(post) + "\n"
+        if post_info[0] == 1:
+            text += "Исполнитель\n"
+        else:
+            text += "Заказчик\n"
+
+        text += "Последний подъем" + nice_time(post_info[3]) + "\n"
+        if post_info[4]:
+            text += "Нет автоподъемов\n"
+        else:
+            text += "Есть автоподъемы\n"
+        titl = post_info[1]
+        if len(titl) > 30:
+            titl = titl[:27] + "..."
+
+        text += titl + "\n\n"
+
+    text += "--------\n"
+    count = db.get_user_posts_count(user_id)[0]
+    if count > page * 10:
+        text += "Следующая страница /user_posts_" + str(user_id) + "_" + str(page + 1) + "\n"
+    if page > 0:
+        text += "Предыдущая страница /user_posts_" + str(user_id) + "_" + str(page + 1)
+
+    tb.send_message(chat_id=chat_id, text=text)
+
+
+def edit_post(chat_id: str or int, message_id: str or int,
+              user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 140)
+    post_id = str(post_id)
+    text, keyboard = edit_post_building(post_id)
+
+    tb.edit_message_text(chat_id=chat_id, text=text, message_id=message_id, reply_markup=keyboard)
+
+
+def edit_post_nm(chat_id: str or int, user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 140)
+    post_id = str(post_id)
+    text, keyboard = edit_post_building(post_id)
+
+    tb.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+
+
+def edit_title_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 141)
+    text = "Введите новое название"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+def edit_description_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 142)
+    text = "Введите новое описание"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+def edit_memo_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 143)
+    text = "Введите новую памятку"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+def edit_contacts_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 144)
+    text = "Введите новые контакты"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+def edit_guarantee(chat_id: str or int, user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 145)
+    post_id = str(post_id)
+    text = "Нужна ли гарантия?"
+    keyboard = types.ReplyKeyboardMarkup(row_width=2)
+    keyboard.add(types.InlineKeyboardButton(text="Да",
+                                            callback_data="edit_guarantee_yes"),
+                 types.InlineKeyboardButton(text="Нет",
+                                            callback_data="edit_pbp_guarantee_no")
+                 )
+    keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                            callback_data="edit_menu_" + post_id))
+    tb.edit_message_text(chat_id=chat_id, reply_markup=keyboard, text=text)
+
+
+def edit_portfolio_fr(chat_id: str or int, user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 146)
+    post_id = str(post_id)
+    text = "Отправьте ссылку на свое портфолио или пропустите этот шаг?"
+    keyboard = types.ReplyKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(text="Пропустить",
+                                            callback_data="edit_portfolio_skip")
+                 )
+    keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                            callback_data="edit_menu_" + post_id))
+    tb.edit_message_text(chat_id=chat_id, reply_markup=keyboard, text=text)
+
+
+def edit_portfolio_cu(chat_id: str or int, user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 147)
+    post_id = str(post_id)
+    text = "Нужно ли портфолио?"
+    keyboard = types.ReplyKeyboardMarkup(row_width=2)
+    keyboard.add(types.InlineKeyboardButton(text="Да",
+                                            callback_data="edit_portfolio_yes"),
+                 types.InlineKeyboardButton(text="Нет",
+                                            callback_data="edit_portfolio_no")
+                 )
+    keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                            callback_data="edit_menu_" + post_id))
+    tb.edit_message_text(chat_id=chat_id, reply_markup=keyboard, text=text)
+
+
+def edit_payment(chat_id: str or int, user_id: str or int, post_id: str or int):
+    db.set_user_step(user_id, 148)
+    post_id = str(post_id)
+    text = "ВЫберите новый тип цены"
+    keyboard = types.ReplyKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(text="Договорная",
+                                            callback_data="edit_dog"))
+    keyboard.add(types.InlineKeyboardButton(text="Фиксированная",
+                                            callback_data="edit_fixed"))
+    keyboard.add(types.InlineKeyboardButton(text="Диапозон цен",
+                                            callback_data="edit_range"))
+    keyboard.add(types.InlineKeyboardButton(text="Назад",
+                                            callback_data="edit_menu_" + post_id))
+    tb.edit_message_text(chat_id=chat_id, reply_markup=keyboard, text=text)
+
+
+
+def edit_fixed_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 1183)
+    text = "Введите новые контакты"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+def edit_first_num_range_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 180)
+    text = "Введите минимальную цену"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+def edit_second_num_range_nm(chat_id: str or int, user_id: str or int):
+    db.set_user_step(user_id, 181)
+    text = "Введите максимальную цену"
+    tb.send_message(text=text, chat_id=chat_id)
+
+
+
+
+
+
+
+

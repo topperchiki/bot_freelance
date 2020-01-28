@@ -12,6 +12,9 @@ import random
 import time
 import re
 from threading import Thread
+from string import digits, ascii_lowercase, ascii_uppercase
+
+ascii_letters = digits + ascii_uppercase + ascii_lowercase
 
 tb = telebot.TeleBot(TOKEN)
 
@@ -135,7 +138,11 @@ def query_handler(call):
             return
 
     # Handle command
-
+    
+    time_sent = call.message.date
+    if time_sent + 155520 <= time.time():
+        return
+    
     call_data_lowered = call.data.lower()
     if call_data_lowered == "noanswer":
         return
@@ -163,7 +170,8 @@ def query_handler(call):
             return
 
         elif call_data_lowered == "referral":
-            mes.generate_referral(user_id, chat_id)
+
+            mes.generate_referral(user_id, db.get_user_code(user_id)[0])
             return
 
         elif call_data_lowered[:10] == "createpost":
@@ -499,6 +507,7 @@ def query_handler(call):
                 new_post_id = random.randint(1, 1000000)
 
             creation_date = int(time.time())
+            print(len(all_post))
             db.add_post(new_post_id, user_id, creation_date, creation_date,
                         *all_post)
 
@@ -1198,12 +1207,13 @@ def query_handler(call):
                     mes.post_has_auto_ups(chat_id, message_id, post_id)
                     return
 
-                rate_info = db.get_rate_time_and_price_if_exist(rate_id)
-                if not len(rate_info):
+                rate_info = db.get_rate_show_status_time_and_price_if_exist(rate_id)
+                if not len(rate_info) or not rate_info[0]:
                     mes.text_message(chat_id, "Такого тарифа не существует")
                     return
 
-                update_time, price = rate_info
+                update_time = rate_info[1]
+                price = rate_info[2]
 
                 db.set_user_chose_rate_and_post_to(user_id, rate_id, post_id)
 
@@ -1258,48 +1268,489 @@ def query_handler(call):
             mes.send_post(ID_POST_CHANNEL, post_id)
             mes.get_post(chat_id, message_id, post_id)
             return
-        #
-        # elif call_data_lowered[:8] == "getpost":
-        #
-        #
-        # elif call_data_lowered[:4] == "edit":
-        #     left_part = call_data_lowered[4:]
-        #     if left_part == "title":
-        #
-        #     elif left_part == "guarantee_yes":
-        #
-        #     elif left_part == "guarantee_no":
-        #
-        #     elif left_part == "portfolio_yes":
-        #
-        #     elif left_part == "portfolio_no":
-        #
-        #     elif left_part == "description":
-        #
-        #     elif left_part == "memo":
-        #
-        #     elif left_part == "portfolio":
-        #
-        #     elif left_part == "guarantee":
-        #
-        #     elif left_part == "contacts":
-        #
-        #     elif left_part == "categories":
-        #
-        #     elif left_part == "categories_1":
-        #
-        #     elif left_part == "categories_b":
-        #
-        #     elif left_part == "portfolio_delete":
-        #
-        #     elif left_part == "pay_type1":
-        #
-        #     elif left_part == "pay_type2":
-        #
-        #     elif left_part == "pay_type3":
-        #
-        #     elif left_part == "payment":
-        #
+
+        elif call_data_lowered[:4] == "edit":
+            left_part = call_data_lowered[5:]
+
+            if left_part[:4] == "menu":
+                try:
+                    post_id = int(left_part[5:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                db.set_post_editing(user_id, post_id)
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(text="К редактированию ✅",
+                                                                callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+                mes.edit_post_nm(chat_id, user_id, post_id)
+                return
+
+            elif left_part[:5] == "title":
+                try:
+                    post_id = int(left_part[5:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                db.set_post_editing(user_id, post_id)
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(
+                    text="Название ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+                mes.edit_title_nm(chat_id, user_id)
+                return
+
+            elif left_part[:11] == "description":
+                try:
+                    post_id = int(left_part[5:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                db.set_post_editing(user_id, post_id)
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(
+                    text="Описание ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+                mes.edit_description_nm(chat_id, user_id)
+                return
+
+            elif left_part[:4] == "memo":
+                try:
+                    post_id = int(left_part[5:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                db.set_post_editing(user_id, post_id)
+                keyboard = telebot.types.InlineKeyboardMarkup(row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(
+                    text="Описание ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+                mes.edit_memo_nm(chat_id, user_id)
+                return
+
+            elif left_part[:14] == "portfolio_skip":
+                post_id = db.get_edit_post(user_id)[0]
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                ###
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    db.set_post_portfolio(post_id, "")
+                    keyboard = telebot.types.InlineKeyboardMarkup(
+                        row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Пропустить ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+                    mes.get_post_nm(chat_id, post_id)
+                    return
+
+                return
+            elif left_part[:18] == "edit_portfolio_yes":
+                post_id = db.get_edit_post(user_id)[0]
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                ###
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 2:
+                    db.set_post_portfolio(post_id, "1")
+                    keyboard = telebot.types.InlineKeyboardMarkup(
+                        row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Да ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+                    mes.get_post_nm(chat_id, post_id)
+                    return
+
+                return
+
+            elif left_part[:17] == "edit_portfolio_no":
+                post_id = db.get_edit_post(user_id)[0]
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                ###
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 2:
+                    db.set_post_portfolio(post_id, "")
+                    keyboard = telebot.types.InlineKeyboardMarkup(
+                        row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Нет ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+                    mes.get_post_nm(chat_id, post_id)
+                    return
+
+                return
+
+            elif left_part[:9] == "portfolio":
+                try:
+                    post_id = int(left_part[10:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                db.set_post_editing(user_id, post_id)
+
+                ###
+
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    mes.edit_portfolio_fr(chat_id, user_id, post_id)
+                    return
+
+                elif post_type == 2:
+                    mes.edit_portfolio_cu(chat_id, user_id, post_id)
+                    return
+
+            elif left_part[:8] == "contacts":
+                try:
+                    post_id = int(left_part[10:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                db.set_post_editing(user_id, post_id)
+
+                ###
+
+                keyboard = telebot.types.InlineKeyboardMarkup(
+                    row_width=1)
+                keyboard.add(telebot.types.InlineKeyboardButton(
+                    text="Контакты ✅", callback_data="noAnswer"))
+                tb.edit_message_reply_markup(chat_id=chat_id,
+                                             message_id=message_id,
+                                             reply_markup=keyboard)
+                mes.edit_contacts_nm(chat_id, user_id)
+                return
+
+            elif left_part[:3] == "dog":
+                try:
+                    post_id = int(left_part[10:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                db.set_post_editing(user_id, post_id)
+
+                ###
+
+                db.set_post_payment_type_and_prices(post_id, 1, "")
+                mes.get_post_nm(chat_id, post_id)
+                return
+
+            elif left_part[:5] == "range":
+                try:
+                    post_id = int(left_part[10:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                db.set_post_editing(user_id, post_id)
+
+                ###
+
+                db.set_post_new_price(post_id, "")
+                mes.edit_first_num_range_nm(chat_id, user_id)
+                return
+
+            elif left_part[:5] == "fixed":
+                try:
+                    post_id = int(left_part[10:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                db.set_post_editing(user_id, post_id)
+
+                ###
+
+                db.set_post_new_price(post_id, "")
+                mes.edit_fixed_nm(chat_id, user_id)
+                return
+
+            elif left_part[:12] == "payment_type":
+                try:
+                    post_id = int(left_part[10:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                db.set_post_editing(user_id, post_id)
+
+                ###
+
+                mes.edit_payment(chat_id, user_id, post_id)
+                return
+
+            elif left_part[:18] == "edit_guarantee_yes":
+                post_id = db.get_edit_post(user_id)[0]
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                ###
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 2:
+                    db.set_post_guarantee(post_id, True)
+                    keyboard = telebot.types.InlineKeyboardMarkup(
+                        row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Да ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+                    mes.get_post_nm(chat_id, post_id)
+                    return
+
+                return
+
+            elif left_part[:17] == "edit_guarantee_no":
+                post_id = db.get_edit_post(user_id)[0]
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                ###
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 2:
+                    db.set_post_guarantee(post_id, False)
+                    keyboard = telebot.types.InlineKeyboardMarkup(
+                        row_width=1)
+                    keyboard.add(telebot.types.InlineKeyboardButton(
+                        text="Нет ✅", callback_data="noAnswer"))
+                    tb.edit_message_reply_markup(chat_id=chat_id,
+                                                 message_id=message_id,
+                                                 reply_markup=keyboard)
+                    mes.get_post_nm(chat_id, post_id)
+                    return
+
+                return
+
+            elif left_part[:9] == "guarantee":
+                try:
+                    post_id = int(left_part[10:])
+                except ValueError:
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                if len(ans) == 0:
+                    mes.text_message(chat_id, "Объявление удалено")
+                    return
+
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                db.set_post_editing(user_id, post_id)
+
+                ###
+
+                mes.edit_guarantee(chat_id, user_id, post_id)
+                return
 
     elif call.chat.type == "group" and chat_id in ALLOWED_GROUP_CHATS:
         return
@@ -1712,6 +2163,34 @@ def all_left_text_messages(message: telebot.types.Message):
 
             elif user_step == 165:
                 mes.send_posts_page_nm(chat_id, user_id, 1)
+                return
+
+            elif user_step == 140:
+                return
+
+            elif user_step == 141:
+                mes.edit_post_nm(chat_id, user_id, db.get_edit_post(user_id)[0])
+                return
+
+            elif user_step == 142:
+                mes.edit_post_nm(chat_id, user_id, db.get_edit_post(user_id)[0])
+                return
+
+            elif user_step == 143:
+                mes.edit_post_nm(chat_id, user_id, db.get_edit_post(user_id)[0])
+                return
+
+            elif user_step == 144:
+                mes.edit_post_nm(chat_id, user_id, db.get_edit_post(user_id)[0])
+                return
+
+            elif user_step == 145:
+                return
+
+            elif user_step == 146:
+                return
+
+            elif user_step == 147:
                 return
 
         elif lowered_message == "в главное меню" or lowered_message == \
@@ -2418,6 +2897,280 @@ def all_left_text_messages(message: telebot.types.Message):
             elif user_step == 165:
                 return
 
+            elif user_step == 140:
+                return
+
+            elif user_step == 141:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    ans, error_text = is_suitable_title_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_title_cu(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_title(post_id, message.text)
+                mes.get_post(chat_id, user_id, post_id)
+                return
+
+            elif user_step == 142:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    ans, error_text = is_suitable_description_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_description_cu(message.text)
+
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_description(post_id, message.text)
+                mes.get_post(chat_id, user_id, post_id)
+                return
+
+            elif user_step == 143:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    ans, error_text = is_suitable_memo_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_memo_cu(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_memo(post_id, message.text)
+                mes.get_post(chat_id, user_id, post_id)
+                return
+
+            elif user_step == 144:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    ans, error_text = is_suitable_contacts_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_contacts_cu(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_contacts(user_id, message.text)
+                mes.get_post(chat_id, user_id, post_id)
+                return
+
+            elif user_step == 145:
+                return
+
+            elif user_step == 146:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+
+                ans, error_text = is_url(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_portfolio(user_id, message.text)
+                return
+
+            elif user_step == 147:
+                return
+
+            elif user_step == 180:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    ans, error_text = is_suitable_price_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_price_cu(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_new_price(post_id, message.text)
+                mes.edit_second_num_range_nm(chat_id, user_id)
+                return
+
+            elif user_step == 181:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                post_type = db.get_post_type(post_id)[0]
+                min_price = db.get_post_new_price(post_id)[0]
+
+                if post_type == 1:
+                    ans, error_text = is_suitable_price_2_fl(message.text,
+                                                             float(min_price))
+                else:
+                    ans, error_text = is_suitable_price_2_cu(message.text,
+                                                             float(min_price))
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_payment_type_and_prices(post_id, 3, str(min_price) + ";" + message.text)
+                mes.get_post_nm(chat_id, post_id)
+                return
+
+            elif user_step == 182:
+                post_id = db.get_edit_post(user_id)[0]
+                info = db.get_post_owner_id_if_exists(post_id)
+                if len(info) == 0:
+                    mes.text_message(chat_id, "Нет такого объявления")
+                    return
+
+                if info[0] != user_id:
+                    mes.text_message(chat_id, "Это не ваше объявление")
+                    return
+
+                ans = db.get_post_last_edit_if_exist(post_id)
+                left_wait_time = ans[0] + EDITING_DELAY - int(time.time())
+                if left_wait_time > 0:
+                    mes.text_message(chat_id, "Редактировать сообщение можно только "
+                                              "через 24 часа с последнего подъема. "
+                                              "Вы сможете редактировать "
+                                              "это объявление "
+                                              "через " + mes.nice_time(left_wait_time))
+                    return
+                post_type = db.get_post_type(post_id)[0]
+                if post_type == 1:
+                    ans, error_text = is_suitable_price_fl(message.text)
+                else:
+                    ans, error_text = is_suitable_price_cu(message.text)
+                if not ans:
+                    mes.text_message(chat_id, error_text)
+                    return
+
+                db.set_post_payment_type_and_prices(post_id, 2, message.text)
+                mes.get_post_nm(chat_id, post_id)
+                return
+
     elif message.chat.type == 'group':
 
         lowered_message = message.text.lower()
@@ -2578,312 +3331,485 @@ def handle_common_command(command: str, chat_id: str or int, user_id: str or int
         mes.get_post_nm(chat_id, post_id)
         return True
 
-    # TODO  reports bot
-    # elif command[:7] == "/report":
-    #     left_part = command[8:]
-    #     try:
-    #         post_id = int(left_part)
-    #     except ValueError:
-    #         return
-    #
-    #     ans = db.get_user_report_if_exist(user_id, post_id)
-    #     if len(ans):
-    #         mes.text_message(chat_id, "Вы уже жаловались на это объявление")
-    #         return
-    #
-    #     reports = ans.get_post_reports(post_id)
-    #     reports += 1
-    #     db.add_user_report(user_id, post_id)
-    #
-    #     if are_reports_enough(reports):
-    #         db.set_post_reports_and_sent_status(post_id, reports, True)
-    #         mes.send_report_ticket(ID_MANAGE_CHANNEL, post_id)
-    #         return
-    #
-    #     db.set_post_reports(post_id, reports)
-    #     mes.text_message(chat_id, "Ваша жалоба отправлена")
-    #     return
-    #
-    # elif command[:14] == "/cancel_report":
-    #     left_part = command[15:]
-    #     try:
-    #         post_id = int(left_part)
-    #     except ValueError:
-    #         return
-    #
-    #     ans = db.get_user_report_if_exist(user_id, post_id)
-    #     if not len(ans):
-    #         mes.text_message(chat_id, "Вы ещё не жаловались на это объявление")
-    #         return
-    #
-    #     reports = ans.get_post_reports(post_id)
-    #     reports -= 1
-    #     db.del_user_report(user_id, post_id)
-    #     db.set_post_reports(post_id, reports)
-    #     mes.text_message(chat_id, "Ваша жалоба отменена")
-    #     return
+    elif command[:7] == "/report":
+        left_part = command[8:]
+        try:
+            post_id = int(left_part)
+        except ValueError:
+            return
+
+        ans = db.get_user_report_if_exist(user_id, post_id)
+        if len(ans):
+            mes.text_message(chat_id, "Вы уже жаловались на это объявление")
+            return
+
+        reports = ans.get_post_reports(post_id)
+        reports += 1
+        db.add_user_report(user_id, post_id, int(time.time()))
+
+        if are_reports_enough(post_id):
+            db.set_post_reports_and_sent_status(post_id, reports, True)
+            mes.text_message(chat_id, "Ваша жалоба отправлена.\n"
+                                      "Отменить /cancel_report_" + str(post_id))
+            mes.send_report_ticket(ID_MANAGE_CHANNEL, post_id, )
+            return
+
+        db.set_post_reports(post_id, reports)
+        mes.text_message(chat_id, "Ваша жалоба отправлена.\n"
+                                  "Отменить /cancel_report_" + str(post_id))
+        return
+
+    elif command[:14] == "/cancel_report":
+        left_part = command[15:]
+        try:
+            post_id = int(left_part)
+        except ValueError:
+            return
+
+        ans = db.get_user_report_if_exist(user_id, post_id)
+        if not len(ans):
+            mes.text_message(chat_id, "Вы не жаловались на это объявление")
+            return
+
+        reports = ans.get_post_reports(post_id)
+        reports -= 1
+        db.del_user_report(user_id, post_id)
+        db.set_post_reports(post_id, reports)
+        mes.text_message(chat_id, "Ваша жалоба отменена")
+        return
+
+    elif command[:9] == "/use_code":
+        code = command[10:]
+        ref_id = db.get_user_referral_id(user_id)[0]
+        if ref_id:
+            mes.text_message(chat_id, "Вы уже активировали реферальный код")
+            return
+
+        code = db.get_info_referral_code_if_exist(code)
+        if len(code) == 0:
+            mes.text_message(chat_id, "Такого кода не существует")
+            return
+        db.set_user_referral_id(user_id, code[1])
+        db.set_referral_code_user_count(code[1], code[0] + 1)
+        mes.text_message(chat_id, "Код активирован")
+        return
 
 
 #
 def handle_admin_command(command: str, chat_id: str or int, user_id: str or int, chat_type=1):
-    try:
-        if str(command[:9]) == '/unverify':
-            try:
-                user_id_to_unverify = command[10:]
-                if user_id_to_unverify[-1] == "]":
-                    user_id_to_unverify = user_id_to_unverify[:-1]
+    if str(command[:9]) == '/unverify':
+        try:
+            user_id_to_unverify = command[10:]
 
-                user_id_to_unverify = int(user_id_to_unverify)
+            user_id_to_unverify = int(user_id_to_unverify)
 
-            except ValueError:
-                mes.text_message(chat_id, "Неверный формат id")
-                return True
-
-            db.set_user_verification_status(user_id_to_unverify, False)
-            status = db.get_user_verification_status(user_id_to_unverify)[0]
-            db.set_verification_ticket_status(user_id_to_unverify, status & 63)
-            mes.text_message(chat_id,
-                             "Если пользователь с таким ID существует, то его данные обновлены")
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
             return True
 
-        elif command[:7] == "/verify":
-            try:
-                user_id_to_verify = command[8:]
-                if user_id_to_verify[-1] == "]":
-                    user_id_to_verify = user_id_to_verify[:-1]
-
-                user_id_to_verify = int(user_id_to_verify)
-            except ValueError:
-                mes.text_message(chat_id, "Неверный формат id")
-                return True
-
-            status = db.get_user_verification_status(user_id_to_verify)[0]
-            db.set_user_verification_status(user_id_to_verify, True)
-            db.set_verification_ticket_status(user_id_to_verify, status | 128)
-            mes.text_message(chat_id,
-                             "Если пользователь с таким ID существует, то его данные обновлены")
-            return True
-
-        elif command[:10] == "/user_info":
-
-            try:
-                user_id_to_info= command[11:]
-
-                user_id_to_info = user_id_to_info[:-1]
-                user_id_to_info = int(user_id_to_info)
-                info = db.get_user_info(user_id_to_info)
-                sms = 'ID пользователя: ' + str(info[0]) + '\n'
-                sms += 'Постов у юзера: ' + str(info[1]) + '\n'
-                sms += 'Ручных апов: ' + str(info[2]) + '\n'
-                sms += 'Потрачено денег: : ' + str(info[3]) + ' руб' + '\n'
-                sms += 'Верифицирован: ' + str(info[4]) + '\n'
-                sms += 'Наличие бана: ' + str(info[7]) + '\n'
-                mes.text_message(chat_id, sms)
-            except ValueError:
-                mes.text_message(chat_id, "Неверный формат id")
-                return True
-            return True
-
-        elif command[:9] == "/ban_user":
-            try:
-                user_id_to_ban = command[10:]
-
-                user_id_to_ban = user_id_to_ban[:-1]
-                user_id_to_ban = int(user_id_to_ban)
-                db.set_ban_status(True,user_id_to_ban)
-                mes.text_message(chat_id,
-                                 "Пользователь успешно забанен, его объявления удалены, автоподьемы обнулены, доступ к платформе заблокирован ")
-            except ValueError:
-                mes.text_message(chat_id, "Неверный формат id")
-                return True
-
-            return True
-
-        elif command[:12] == "/delete_user":
-            return True
-
-        elif command[:11] == "/user_posts":
-            return True
-
-        elif command[:10] == "/hide_rate":
-            return True
-
-        elif command[:12] == "/delete_rate":
-            return True
-
-        elif command[:12] == "/create_rate":
-            return True
-
-        elif command[:10] == "/show_rate":
-            return True
-
-        elif command[:18] == "/set_referral_code":
-            # До 30 символов! (включительно)
-            try:
-                user_id_to_ref = command[19:]
-                i = 0
-                while user_id_to_ref[i]!=']':
-                    i +=1
-                code = user_id_to_ref[i+2:len(user_id_to_ref)-1]
-                user_id_to_ref = user_id_to_ref[:i]
-                user_id_to_ref = int(user_id_to_ref)
-                print(code)
-                print(user_id_to_ref)
-
-                db.set_referral_code(code, user_id)
-                mes.text_message(chat_id,
-                                 "Пользователю успешно присвоен реферальный код ")
-            except ValueError:
-                mes.text_message(chat_id, "Неверный формат id")
-                return True
-
-            return True
-
-        elif command[:11] == "/list_posts":
-            return True
-
-        elif command[:12] == "/delete_post":
-            return True
-
-        elif command[:10] == "/post_info":
-            try:
-                post_info = command[13:]
-                post_info = post_info[:-1]
-                post_info = int(post_info)
-                info = db.get_post_all(post_info)
-                sms = 'Тип обьявления: ' + str(info[0]) + '\n'
-                sms += 'Загаловок: ' + str(info[1]) + '\n'
-                sms += 'Дата создания: ' + str(info[10]) + '\n'
-                sms += 'Последний подъём: ' + str(info[11]) + ' руб' + '\n'
-                sms += 'Id создателя: ' + str(info[14]) + '\n'
-                sms += 'Сколько автоподъёмов использовано: ' + str(info[13]) + '\n'
-                sms += 'Сколько автоподъёмов осталось исполнить: ' + str(info[12]) + '\n'
-                mes.text_message(chat_id, sms)
-            except ValueError:
-                mes.text_message(chat_id, "Неверный формат id")
-                return True
-            return True
-
-        elif command[:12] == "/clear_cache":
-            return True
-
-        elif command[:10] == "/add_admin":
-            left_part = command[11:]
-
-            try:
-                admin_id = int(left_part)
-            except ValueError:
-                mes.text_message(chat_id, "Формат команды "
-                                          "/add_admin_АЙдиПользователя")
-                return True
-
-            db.set_admin_status(admin_id, True)
-            mes.text_message(chat_id,
-                             "Если такой пользователь существует, "
-                             "то он был назначен Администратором")
-            return True
-
-        elif command[:10] == "/del_admin":
-            left_part = command[11:]
-
-            try:
-                admin_id = int(left_part)
-            except ValueError:
-                mes.text_message(chat_id, "Формат команды /add_admin_АЙдиПользователя")
-                return True
-
-            db.set_admin_status(admin_id)
-            mes.text_message(chat_id, "Если такой пользователь есть, то он перестал быть Администратором")
-            return True
-
-        elif command[:9] == "/commands":
-            mes.text_message(chat_id, T_COMMANDS_LIST)
-            return True
-
-        if chat_type == 2:
-
-            if command[:10] == "/approve_v":
-                left_part = command[11:]
-
-                try:
-                    user_id_to_act = int(left_part)
-                except ValueError:
-                    mes.text_message(chat_id, "Команда введена неверно. "
-                                              "Неудается получить id пользователя")
-                    return True
-                status = db.get_verification_ticket_status(user_id_to_act)[0]
-
-                if (status >> 7 & 1):
-                    mes.text_message(chat_id, "Пользователь был верифицирован "
-                                              "лично администрацией. "
-                                              "(Через команду /verify)")
-                    return
-
-                if not (status >> 4 & 1):
-                    mes.text_message(chat_id, "Действие невозможно выполнить. "
-                                              "Пользователь отменил заявку "
-                                              "или ещё не отправлял её")
-                    return
-
-                if (status >> 5 & 1):
-                    if (status >> 6 & 1):
-                        mes.text_message(chat_id, "Пользователь уже верифицирован")
-                    else:
-                        mes.text_message(chat_id, "Пользователь не верифицирован. "
-                                                  "Последняя его заявка была "
-                                                  "отклонена, а новых он не отправлял")
-                    return
-
-                db.set_verification_status(user_id_to_act, True)
-                status = (status | (1 << 5) | (1 << 6))
-                db.set_verification_ticket_status(user_id, status)
-                mes.text_message(chat_id, str(user_id_to_act)
-                                 + " теперь верифицирован!")
-                return
-
-            elif command[:7] == "/deny_v":
-                left_part = command[8:]
-
-                try:
-                    user_id_to_act = int(left_part)
-                except ValueError:
-                    mes.text_message(chat_id, "Команда введена неверно. "
-                                              "Неудается получить id пользователя")
-                    return True
-                status = db.get_verification_ticket_status(user_id_to_act)[0]
-                if not (status >> 4 & 1):
-                    mes.text_message(chat_id, "Действие невозможно выполнить. "
-                                              "У пользователя нет ожидающих проверки запросов на верификацию")
-                    return
-
-                if (status >> 5 & 1):
-                    mes.text_message(chat_id, "Пользователь не отправлял"
-                                              " новых заявок с прошлого раза")
-                    return
-
-                db.set_verification_status(user_id_to_act, True)
-                status = (status | (1 << 5))
-                db.set_verification_ticket_status(user_id, status)
-                mes.text_message(chat_id, str(user_id_to_act) + " заяка на верификацию отклонена")
-                return
-
-    except ValueError:
-        mes.text_message(chat_id, "Неверный формат id")
+        db.set_user_verification_status(user_id_to_unverify, False)
+        status = db.get_user_verification_status(user_id_to_unverify)[0]
+        db.set_verification_ticket_status(user_id_to_unverify, status & 63)
+        mes.text_message(chat_id,
+                         "Данные пользователя обновлены")
         return True
+
+    elif command[:7] == "/verify":
+        try:
+            user_id_to_verify = command[8:]
+
+            user_id_to_verify = int(user_id_to_verify)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+
+        status = db.get_user_verification_status(user_id_to_verify)[0]
+        db.set_user_verification_status(user_id_to_verify, True)
+        db.set_verification_ticket_status(user_id_to_verify, status | 128)
+        mes.text_message(chat_id,
+                         "Данные пользователя обновлены")
+        return True
+
+    elif command[:10] == "/user_info":
+        try:
+            user_id_to_act = command[11:]
+
+            user_id_to_act = int(user_id_to_act)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+
+        mes.send_user_info(chat_id, user_id_to_act)
+        return True
+
+    elif command[:9] == "/ban_user":
+        try:
+            user_id_to_act = command[10:]
+
+            user_id_to_act = int(user_id_to_act)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+        
+        info = db.get_user_ban_status_is_admin(user_id_to_act)
+        if len(info) == 0:
+            mes.text_message(chat_id, "Такого пользователя не существует")
+            return True
+        
+        if info[0]:
+            if info[1]:
+                mes.text_message(chat_id, "Пользователь уже заблокирован и извещен о блокировке")
+                return True
+
+            mes.text_message(chat_id, "Пользователь уже заблокирован, но ещё не знает об этом")
+            return True
+        else:
+            db.set_user_ban_status(user_id, True)
+            mes.text_message(chat_id, "Пользователь заблокирован")
+        return True
+
+    elif command[:11] == "/unban_user":
+        try:
+            user_id_to_act = command[12:]
+
+            user_id_to_act = int(user_id_to_act)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+
+        info = db.get_user_ban_status_is_admin(user_id_to_act)
+        if len(info) == 0:
+            mes.text_message(chat_id, "Такого пользователя не существует")
+            return True
+
+
+        db.set_user_ban_status(user_id, False)
+        db.set_user_notified_ban(user_id, False)
+        mes.text_message(chat_id, "Пользователь разблокирован")
+        return True
+
+    elif command[:11] == "/user_posts":
+        try:
+            index = 12
+            l_command = len(command)
+            while index < l_command and command[index] in digits:
+                index += 1
+
+            user_id_to_act = command[12:index]
+            page = command[index + 1:]
+            if page is None:
+                page = 1
+            page = int(page)
+            if page < 0:
+                raise ValueError
+            user_id_to_act = int(user_id_to_act)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат данных")
+            return True
+
+        info = db.get_admin_status_if_exists(user_id, user_id_to_act)
+        if len(info) == 0:
+            mes.text_message(chat_id, "Такого пользователя нет")
+            return True
+        mes.send_admin_posts(chat_id, user_id_to_act, page)
+        return True
+
+    elif command[:10] == "/hide_rate":
+        try:
+            rate_id = command[11:]
+
+            rate_id = int(rate_id)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+
+        rate_time = db.get_rate_time_if_exist(rate_id)
+        if len(rate_time) == 0:
+            mes.text_message(chat_id, "Нет тарифа с таким id")
+            return True
+
+        db.set_rate_show_status(rate_id, False)
+        mes.text_message(chat_id, "Тариф скрыт")
+        return True
+
+    elif command[:12] == "/create_rate":
+        try:
+            index = 13
+            l_command = len(command)
+            while index < l_command and command[index] in digits:
+                index += 1
+
+            rate_time = int(command[13:index])
+            price = int(command[index + 1:])
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат данных")
+            return True
+
+        new_rate_id = random.randint(1, 1000000)
+        while bool(db.get_rate_time_if_exist(new_rate_id)):
+            new_rate_id = random.randint(1, 1000000)
+
+        db.add_rate(new_rate_id, rate_time, price)
+        mes.text_message(chat_id, "Тариф добавлен. "
+                                  "Его id: " + str(new_rate_id) + \
+                                  "\nЧтобы показать его, введите "
+                                  "/show_rate_" + str(new_rate_id))
+        return True
+
+    elif command[:10] == "/show_rate":
+        try:
+            rate_id = command[11:]
+
+            rate_id = int(rate_id)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+        rate_time = db.get_rate_time_if_exist(rate_id)
+        if len(rate_time) == 0:
+            mes.text_message(chat_id, "Нет тарифа с таким id")
+            return True
+
+        db.set_rate_show_status(rate_id, True)
+        mes.text_message(chat_id, "Тариф показан")
+        return True
+
+    elif command[:18] == "/set_referral_code":
+        try:
+            left_part = command[11:]
+            p = left_part.split()
+            user_id_to_act = int(p[0])
+            new_code = p[1]
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат данных")
+            return True
+
+        db.set_referral_code(new_code, user_id_to_act)
+        mes.text_message(chat_id, "Пользователю успешно присвоен реферальный код ")
+        return True
+
+    elif command[:12] == "/delete_post":
+        try:
+            post_id = int(command[13:])
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+
+        db.delete_post(post_id)
+        db.delete_auto_action_with_post_id(post_id)
+        mes.text_message(chat_id, "Объявление удалено")
+        return True
+
+    elif command[:10] == "/post_info":
+        try:
+            post_id = int(command[11:])
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+
+        owner = db.get_post_owner_id_if_exists(post_id)
+        if len(owner) == 0:
+            mes.text_message(chat_id, "Объявления с таким id не существует")
+            return True
+
+        mes.send_post_info(chat_id, post_id)
+        return True
+
+    elif command[:9] == "/get_rate":
+        try:
+            rate_id = command[10:]
+            rate_id = int(rate_id)
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+
+        info = db.get_rate_time_if_exist(rate_id)
+        if len(info) == 0:
+            mes.text_message(chat_id, "Нет такого тарифа")
+            return True
+
+        mes.send_rate_info(chat_id, rate_id)
+        return True
+
+    elif command[:10] == "/add_admin":
+        left_part = command[11:]
+
+        try:
+            admin_id = int(left_part)
+        except ValueError:
+            mes.text_message(chat_id, "Формат команды "
+                                      "/add_admin_АЙдиПользователя")
+            return True
+
+        db.set_admin_status(admin_id, True)
+        mes.text_message(chat_id,
+                         "Если такой пользователь существует, "
+                         "то он был назначен Администратором")
+        return True
+
+    elif command[:10] == "/del_admin":
+        left_part = command[11:]
+
+        try:
+            admin_id = int(left_part)
+        except ValueError:
+            mes.text_message(chat_id, "Формат команды /add_admin_АЙдиПользователя")
+            return True
+
+        db.set_admin_status(admin_id)
+        mes.text_message(chat_id, "Если такой пользователь есть, то он перестал быть Администратором")
+        return True
+
+    elif command[:9] == "/commands":
+        mes.text_message(chat_id, T_COMMANDS_LIST)
+        return True
+
+    elif command[:13] == "/reset_report":
+        try:
+            post_id = int(command[14:])
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+        ans = db.get_post_owner_id_if_exists(post_id)
+        if len(ans) == 0:
+            mes.text_message(chat_id, "Объявления с таким id не существует")
+            return True
+
+        db.del_all_post_report(post_id)
+        db.set_post_reports_and_sent_status(post_id, False, False)
+        mes.text_message(chat_id, "Жалобы обнулены")
+        return True
+
+    elif command[:15] == "/delete_message":
+        try:
+            message_id = int(command[16:])
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+        try:
+            tb.delete_message(ID_POST_CHANNEL, message_id)
+        except Exception:
+            mes.text_message(chat_id, "Ошибка")
+            return
+
+        mes.text_message(chat_id, "Сообщение удалено")
+        return True
+
+    elif command[:12] == "/delete_post":
+        try:
+            post_id = int(command[13:])
+        except ValueError:
+            mes.text_message(chat_id, "Неверный формат id")
+            return True
+        ans = db.get_post_owner_id_if_exists(post_id)
+        if len(ans) == 0:
+            mes.text_message(chat_id, "Объявления с таким id не существует")
+            return True
+
+        db.delete_post(post_id)
+        mes.text_message(chat_id, "Объявление удалено")
+        return True
+
+    elif command[:11] == "/copy_table":
+        table_name = command[12:]
+        try:
+            db.get_table_to_csv(table_name)
+        except Exception:
+            mes.text_message(chat_id, "Ошибка")
+            raise
+            return
+
+        file = open("users.csv", "rb")
+        tb.send_document(chat_id, file)
+        file.close()
+        return
+
+    if chat_type == 2:
+
+        if command[:10] == "/approve_v":
+            left_part = command[11:]
+
+            try:
+                user_id_to_act = int(left_part)
+            except ValueError:
+                mes.text_message(chat_id, "Команда введена неверно. "
+                                          "Неудается получить id пользователя")
+                return True
+            status = db.get_verification_ticket_status(user_id_to_act)[0]
+
+            if (status >> 7 & 1):
+                mes.text_message(chat_id, "Пользователь был верифицирован "
+                                          "лично администрацией. "
+                                          "(Через команду /verify)")
+                return
+
+            if not (status >> 4 & 1):
+                mes.text_message(chat_id, "Действие невозможно выполнить. "
+                                          "Пользователь отменил заявку "
+                                          "или ещё не отправлял её")
+                return
+
+            if (status >> 5 & 1):
+                if (status >> 6 & 1):
+                    mes.text_message(chat_id, "Пользователь уже верифицирован")
+                else:
+                    mes.text_message(chat_id, "Пользователь не верифицирован. "
+                                              "Последняя его заявка была "
+                                              "отклонена, а новых он не отправлял")
+                return
+
+            db.set_verification_status(user_id_to_act, True)
+            status = (status | (1 << 5) | (1 << 6))
+            db.set_verification_ticket_status(user_id, status)
+            mes.text_message(chat_id, str(user_id_to_act)
+                             + " теперь верифицирован!")
+            return
+
+        elif command[:7] == "/deny_v":
+            left_part = command[8:]
+
+            try:
+                user_id_to_act = int(left_part)
+            except ValueError:
+                mes.text_message(chat_id, "Команда введена неверно. "
+                                          "Неудается получить id пользователя")
+                return True
+            status = db.get_verification_ticket_status(user_id_to_act)[0]
+            if not (status >> 4 & 1):
+                mes.text_message(chat_id, "Действие невозможно выполнить. "
+                                          "У пользователя нет ожидающих проверки запросов на верификацию")
+                return
+
+            if (status >> 5 & 1):
+                mes.text_message(chat_id, "Пользователь не отправлял"
+                                          " новых заявок с прошлого раза")
+                return
+
+            db.set_verification_status(user_id_to_act, True)
+            status = (status | (1 << 5))
+            db.set_verification_ticket_status(user_id, status)
+            mes.text_message(chat_id, str(user_id_to_act) + " заяка на верификацию отклонена")
+            return
+        
     return False
 
 
-def set_code(user_id, code, chat_id):
-    print(code)
-    db.set_referral_code(code, user_id)
-    mes.text_message(chat_id,
-                     "Пользователю успешно присвоен реферальный код ")
-
-
 #
+def gen_code(leng: int):
+    text = ""
+    for i in range(leng):
+        text += ascii_letters[random.randint(0, 62)]
+    return text
+
+
 def adding_new_user(user_id: str):
-    db.add_user(user_id, int(time.time()))
     db.add_row_to_vtickets(user_id)
+
+    db.add_user(user_id, int(time.time()))
+    code = gen_code(6)
+    while len(db.get_referral_code_info_if_exist(code)):
+        code = gen_code(6)
+
+    db.add_ref_code(user_id, code)
 
 
 #
@@ -2918,6 +3844,7 @@ def auto_actions():
 #
 if __name__ == "__main__":
     Thread(target=auto_actions).start()
-
+    
     tb.polling(none_stop=True)
+
 

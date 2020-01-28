@@ -9,9 +9,13 @@ ALLOWED_GROUP_CHATS = {ID_POST_CHANNEL, ID_MANAGE_CHANNEL}
 
 # Payment
 PAYMENT_PROVIDER = '410694247:TEST:1496cc79-d856-44c4-9aa0-0271d717ca9f'
+MANUAL_UPS_PRICE = 50
 
 # Files' path
 P_ACTIONS = "./data/actions.txt"
+
+# Other limits
+EDITING_DELAY = 86400
 
 # Letters limits
 FREELANCE_TITLE_LETTERS_LIMIT = 50
@@ -28,9 +32,10 @@ VERIFICATION_LINKS_LETTERS_LIMIT = 500
 
 # db info
 DB_NAME = 'test_db'
-DB_USER = 'testrole'
+DB_USER = 'postgres'
 DB_HOST = '127.0.0.1'
 DB_PASS = '123456'
+OUTPUT_PATH = ''
 
 # text
 T_COMPLETE_EDITING = "Закончите редактирование"
@@ -53,27 +58,33 @@ T_HELP_VERIFICATION_EDIT = "Чтобы отредактировать заявк
                            "и нажмите кнопку \"Редактировать\".  " \
                            "Если вы уже отправили заявку, от сперва нужно " \
                            "отменить её (оплата сохранится)"
-T_COMMANDS_LIST_D = {"/add_admin": "назначение на роль администратора бота",
+T_COMMANDS_LIST_D = {
+                        "/add_admin": "назначение на роль администратора бота",
                         "/del_admin": "снятие роли администратора бота",
-                        "/unverify": "",
-                        "/verify": "",
-                        "/user_info": "",
-                        "/ban_user": "",
-                        "/delete_user": "",
-                        "/user_posts": "",
-                        "/hide_rate": "",
-                        "/delete_rate": "",
-                        "/create_rate": "",
-                        "/show_rate": "",
-                        "/set_referral_code": "",
-                        "/list_posts": "",
-                        "/delete_post": "",
-                        "/post_info": "",
-                        "/clear_cache": ""
+                        "/unverify": "убрать верификацию",
+                        "/verify": "верифицировать от лица администратора. Верификация будет записана поверх заявки пользователя",
+                        "/user_info": "информация о пользователе",
+                        "/ban_user": "заблокировать пользователя",
+                        "/unban_user": "разблокировать пользователя",
+                        "/user_posts": "публикации пользователя. Формат: [ID пользователя] [Страница]",
+                        "/hide_rate": "скрыть тариф покупки автоподъемов",
+                        "/create_rate": "создать тариф автоподъемов. Формат: [Время перерыва в секундах] [Цена за 1 штуку]",
+                        "/show_rate": "сделать тариф доступным для пользователей",
+                        "/set_referral_code": "поставить пользоватлю заданный реферральный код. Фомарт: [ID пользователя] [Код без пробелов]",
+                        "/delete_post": "удалить обхявление из БД",
+                        "/post_info": "информация о публикации",
+                        "/get_rate": "информация о тарифе",
+                        "/reset_reports": "сбросить жалобы для данного объявления",
+                        "/delete_message": "удалить сообщение по message_id из канала для объявлений",
+                        "/copy_table": "выгрузить таблицу с данным названеим из БД в .csv"
                         }
 
 # NOT TO EDIT
 URL_CONTACT_ACC = "https://t.me/" + CONTACT_ACC_USERNAME
+URL_ACTION = "Пригласите 5 друзей по данной ссылке и " \
+             "получите 1 ручной подъем!\nhttps://t.me/" + BOT_USERNAME
+URL_ACTION_START_REFERRAL = URL_ACTION + "?start="
+URL_ACTION_REPORT = URL_ACTION + "?report_"
 CANT_READ_FILE_EXCEPTIONS = FileNotFoundError, FileExistsError, NotADirectoryError
 T_COMMANDS_LIST = ""  #  SCROLL BELOW TO GENERATORS
 POSSIBLE_COME_TO_SIDEMENU = {1, 4, 100}
@@ -123,7 +134,7 @@ POSSIBLE_COME_TO_EDIT_PBP_PRICE_2_CU = {116}
 POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_FR = {31, 30, 25}
 POSSIBLE_COME_TO_EDIT_PBP_GUARANTEE_CU = {124, 123, 118}
 POSSIBLE_COME_TO_VERIFICATION_TICKET = {1, 2, 151, 152, 153}
-POSSIBLE_COME_TO_BUYING_UPS_MENU = {160, 69, 1, 161, 163}
+POSSIBLE_COME_TO_BUYING_UPS_MENU = {160, 69, 1, 161, 163, 162}
 POSSIBLE_COME_TO_BUYING_AUTO_UPS = {160, 163}
 POSSIBLE_COME_TO_BUYING_MANUAL_UPS = {160, 164}
 POSSIBLE_COME_TO_RATES_UPS_MENU = {162, 165}

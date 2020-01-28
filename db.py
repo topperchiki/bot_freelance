@@ -1,6 +1,6 @@
 import psycopg2
 from exceptions import FailedCallDatabase
-from constants import DB_NAME, DB_USER, DB_HOST, DB_PASS
+from constants import DB_NAME, DB_USER, DB_HOST, DB_PASS, OUTPUT_PATH
 
 
 # decorator
@@ -93,8 +93,14 @@ def get_user_step(user_id: str or int):
 
 @d_db_empty
 def add_user(user_id: str or int, data_added: str or int):
-    return "INSERT INTO users (user_id, date_added) VALUES (%s, %s)", \
-           (int(user_id), str(data_added))
+    return "INSERT INTO users (user_id, date_added, referral_author) VALUES (%s, %s, %s)", \
+           (int(user_id), str(data_added), str(user_id))
+
+
+@d_db_empty
+def add_ref_code(user_id: str or int, code: str):
+    return "INSERT INTO referral_codes (author_code_id, ref_code_text, count) VALUES (%s, %s, %s)", \
+           (int(user_id), code, "0")
 
 
 @d_db_empty
@@ -204,6 +210,12 @@ def get_all_users():
 def set_user_ban_status(user_id: str or int, value: bool):
     return "UPDATE users SET banned = %s WHERE user_id = %s", \
            (str(value), str(user_id))
+
+@d_db_empty
+def set_ban_status(user_id: str or int, value: bool):
+    return "UPDATE users SET banned = %s WHERE user_id = %s", \
+           (str(user_id), str(value))
+
 
 
 @d_db_empty
@@ -363,6 +375,13 @@ def get_user_step_ban_status_is_admin(user_id: str or int):
            (str(user_id), )
 
 
+@d_db_exist
+def get_user_ban_status_is_admin(user_id: str or int):
+    return 'SELECT banned, notified_ban, admin FROM users ' \
+           'WHERE user_id = %s', \
+           (str(user_id), )
+
+
 @d_db_empty
 def set_user_notified_ban(user_id: str or int, status: bool):
     return 'UPDATE users SET notified_ban = %s WHERE user_id = %s', \
@@ -377,7 +396,14 @@ def set_user_referral_code(user_id: str or int, author_user_id: str or int):
 
 @d_db_one
 def get_info_referral_code(referral_code: str or int):
-    return 'SELECT ref_code_id, count, author_code_id FROM referral_codes ' \
+    return 'SELECT count, author_code_id FROM referral_codes ' \
+           'WHERE ref_code_text = %s', \
+           (str(referral_code),)
+
+
+@d_db_exist
+def get_info_referral_code_if_exist(referral_code: str or int):
+    return 'SELECT rcount, author_code_id FROM referral_codes ' \
            'WHERE ref_code_text = %s', \
            (str(referral_code),)
 
@@ -481,10 +507,11 @@ def get_referral_code_info(code: str):
            (code,)
 
 
-@d_db_empty
-def set_ban_status(user_id: str or int, value: bool):
-    return "UPDATE users SET banned = %s WHERE user_id = %s", \
-           (str(user_id), str(value))
+@d_db_exist
+def get_referral_code_info_if_exist(code: str):
+    return "SELECT author_code_id, count FROM referral_codes " \
+           "WHERE ref_code_text = %s", \
+           (code,)
 
 
 @d_db_one
@@ -616,6 +643,12 @@ def get_rate_info(rate_id: str or int):
            "WHERE rate_id = %s", (str(rate_id), )
 
 
+@d_db_exist
+def get_rate_info_if_exist(rate_id: str or int):
+    return "SELECT update_time, price, showed FROM rates " \
+           "WHERE rate_id = %s", (str(rate_id), )
+
+
 @d_db_empty
 def add_rate(rate_id: str or int, update_time: str or int, price: str or int,
              showed: bool=False):
@@ -644,11 +677,11 @@ def add_post(post_id: str or int, user_id: str or int,
              post_type: int or str, title: str, description: str, memo: str,
              portfolio: str, contacts: str, categories: str, price: str,
              pay_type: str, guarantee: bool):
-    return "INSERT INTO posts(post_id, owner_id, creation_date, last_up, " \
+    return "INSERT INTO posts(post_id, owner_id, creation_date, last_up, last_edit, " \
            "type, title, description, memo, portfolio, contacts, categories, " \
            "price, pay_type, guarantee) " \
-           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",\
-           (str(post_id), str(user_id), str(creation_date), str(last_up),
+           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",\
+           (str(post_id), str(user_id), str(creation_date), str(last_up), str(creation_date),
             str(post_type), title, description, memo, portfolio, contacts, categories,
             price, str(pay_type), str(guarantee))
 
@@ -775,8 +808,8 @@ def get_showed_rates():
 
 
 @d_db_exist
-def get_rate_time_and_price_if_exist(rate_id: str or int):
-    return 'SELECT update_time, price FROM rates WHERE rate_id = %s', \
+def get_rate_show_status_time_and_price_if_exist(rate_id: str or int):
+    return 'SELECT showed, update_time, price FROM rates WHERE rate_id = %s', \
            (str(rate_id), )
 
 
@@ -818,45 +851,161 @@ def set_post_auto_ups_info(post_id: str or int,
            (str(rate_id), str(ups), str(post_id))
 
 
+@d_db_empty
+def delete_user(user_id: str or int):
+    return "DELETE FROM users WHERE user_id = %s", (str(user_id),)
 
-# TODO  reports db
-# @d_db_exist
-# def get_user_report_if_exist(user_id: str or int, post_id: str or int):
-#     return 'SELECT user_id FROM reports WHERE user_id = %s, ' \
-#            'post_id = %s', \
-#            (str(user_id), str(post_id))
-#
-#
-# @d_db_empty
-# def add_user_report(user_id: str or int, post_id: str or int):
-#     return 'INSERT INTO reports(user_id, post_id) VALUES (%s, %s)',
-#             (str(user_id), str(post_id))
-#
-#
-# @d_db_empty
-# def del_user_report(user_id: str or int, post_id: str or int):
-#     return "DELETE FROM reports WHERE user_id = %s, post_id = %s", \
-#            (str(user_id), str(post_id))
-#
-#
-# @d_db_empty
-# def set_post_reports(post_id: str or int, reports: int or str):
-#     return 'UPDATE posts SET reports = %s WHERE post_id = %s', \
-#            (str(reports), str(post_id))
-#
-#
-# @d_db_empty
-# def set_post_reports_and_sent_status(post_id: str or int, reports: int or str, status: bool):
-#     return 'UPDATE posts SET reports = %s, report_was_sent = %s WHERE post_id = %s', \
-#            (str(reports), str(status), str(post_id))
-#
-#
-# @d_db_one
-# def get_post_reports(post_id: str or int):
-#     return 'SELECT reports FROM posts WHERE post_id = %s', \
-#            (str(post_id), )
-#
-# @d_db_empty
-# def del_all_post_report(post_id: str or int):
-#     return "DELETE FROM reports WHERE post_id = %s", \
-#            (str(post_id))
+
+@d_db_empty
+def delete_post_prepare_user(user_id: str or int):
+    return "DELETE FROM post_prepare WHERE user_id = %s", (str(user_id),)
+
+
+@d_db_empty
+def delete_user_verification_ticket(user_id: str or int):
+    return "DELETE FROM vtickets WHERE user_id = %s", (str(user_id),)
+
+
+@d_db_one
+def get_post_info_admin(post_id: str or int):
+    return "SELECT owner_id, creation_date, type, auto_ups, " \
+           "auto_ups_used, rate_id, last_up, reports, report_was_sent" \
+           "FROM posts WHERE post_id = %s", \
+           (str(post_id),)
+
+
+@d_db_exist
+def get_post_last_edit_if_exist(post_id):
+    return "SELECT last_edit FROM posts WHERE post_id = %s", (str(post_id), )
+
+
+@d_db_one
+def get_post_type(post_id: str or int):
+    return "SELECT type FROM posts WHERE post_id = %s", (str(post_id), )
+
+
+@d_db_exist
+def get_user_report_if_exist(user_id: str or int, post_id: str or int):
+    return 'SELECT user_id FROM reports WHERE user_id = %s, ' \
+           'post_id = %s', \
+           (str(user_id), str(post_id))
+
+
+@d_db_empty
+def add_user_report(user_id: str or int, post_id: str or int, date: int):
+    return 'INSERT INTO reports(user_id, post_id, date) VALUES (%s, %s, %s)', \
+           (str(user_id), str(post_id), str(date))
+
+
+@d_db_empty
+def del_user_report(user_id: str or int, post_id: str or int):
+    return "DELETE FROM reports WHERE user_id = %s, post_id = %s", \
+           (str(user_id), str(post_id))
+
+
+@d_db_empty
+def set_post_reports(post_id: str or int, reports: int or str):
+    return 'UPDATE posts SET reports = %s WHERE post_id = %s', \
+           (str(reports), str(post_id))
+
+
+@d_db_empty
+def set_post_reports_and_sent_status(post_id: str or int, reports: int or str, status: bool):
+    return 'UPDATE posts SET reports = %s, report_was_sent = %s WHERE post_id = %s', \
+           (str(reports), str(status), str(post_id))
+
+
+@d_db_one
+def get_post_reports(post_id: str or int):
+    return 'SELECT reports FROM posts WHERE post_id = %s', \
+           (str(post_id), )
+
+
+@d_db_empty
+def del_all_post_report(post_id: str or int):
+    return "DELETE FROM reports WHERE post_id = %s", \
+           (str(post_id))
+
+
+@d_db_empty
+def set_post_editing(user_id: str or int, post_id: str or int):
+    return "UPDATE users SET post_id = %s WHERE user_id = %s", \
+           (str(post_id), str(user_id))
+
+
+@d_db_empty
+def set_post_portfolio(post_id: str or int, portfolio: str):
+    return 'UPDATE posts SET portfolio = %s WHERE post_id = %s', \
+           (portfolio, str(post_id))
+
+
+@d_db_one
+def get_edit_post(user_id: str or int):
+    return 'SELECT edit_post FROM users WHERE user_id = %s', \
+           (str(user_id),)
+
+
+@d_db_empty
+def set_post_guarantee(post_id: str or int, value: bool):
+    return 'UPDATE posts SET guarantee = %s WHERE post_id = %s', \
+           (str(value), str(post_id))
+
+
+@d_db_empty
+def set_post_title(post_id: str or int, title: str or int):
+    return 'UPDATE posts SET title = %s WHERE post_id = %s', \
+           (str(title), str(post_id))
+
+
+@d_db_empty
+def set_post_description(post_id: str or int, description: str or int):
+    return 'UPDATE posts SET description = %s WHERE post_id = %s', \
+           (str(description), str(post_id))
+
+
+@d_db_empty
+def set_post_memo(post_id: str or int, memo: str or int):
+    return 'UPDATE posts SET memo = %s WHERE post_id = %s', \
+           (str(memo), str(post_id))
+
+
+@d_db_empty
+def set_post_contacts(post_id: str or int, contacts: str or int):
+    return 'UPDATE posts SET contacts = %s WHERE post_id = %s', \
+           (str(contacts), str(post_id))
+
+
+@d_db_empty
+def set_post_payment_type_and_prices(post_id: str or int, pay_type: str or int, prices: str):
+    return 'UPDATE posts SET pay_type = %s, price = %s WHERE post_id = %s', \
+           (str(pay_type), prices, str(post_id))
+
+
+@d_db_empty
+def set_post_new_price(post_id: str or int, new_prices: str):
+    return 'UPDATE posts SET new_price = %s WHERE post_id = %s', \
+           (new_prices, str(post_id))
+
+
+@d_db_one
+def get_post_new_price(post_id: str or int):
+    return 'SELECT new_price FROM posts WHERE post_id = %s', \
+           (str(post_id))
+
+
+@d_db_empty
+def get_table_to_csv(table_name: str):
+    return "COPY (SELECT * FROM " + table_name + ") TO '" + OUTPUT_PATH + "' CSV;", \
+           ()
+
+
+@d_db_one
+def get_user_referral_id(user_id: str or int):
+    return 'SELECT referral_id FROM users WHERE user_id = %s', \
+           (str(user_id),)
+
+
+@d_db_empty
+def set_user_referral_id(user_id: str or int, ref_id: str or int):
+    return 'UPDATE users SET referral_id = %s WHERE user_id = %s', \
+           (str(ref_id), str(user_id))
